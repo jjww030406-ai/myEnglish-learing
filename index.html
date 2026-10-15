@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>英语从零学 · 零基础学习网站</title>
+<link rel="stylesheet" href="css/style.css?v=20261015v">
+</head>
+<body>
+
+<!-- 版本自检 + 错误捕获：必须放在所有脚本之前 -->
+<script>
+(function () {
+  var V = "20261015v";
+  function banner(text, color) {
+    var d = document.getElementById("errBanner");
+    if (d) d.remove();
+    d = document.createElement("div");
+    d.id = "errBanner";
+    d.setAttribute("style",
+      "position:fixed;left:0;right:0;top:0;z-index:99999;padding:12px 16px;" +
+      "background:" + color + ";color:#fff;font:14px/1.7 'Microsoft YaHei',sans-serif;" +
+      "box-shadow:0 2px 14px rgba(0,0,0,.28);white-space:pre-wrap");
+    d.textContent = text;
+    document.documentElement.appendChild(d);
+  }
+  // 1) 抓所有未捕获异常并显示出来 —— 不再出现"点了没反应"却看不到原因
+  window.addEventListener("error", function (e) {
+    var f = (e.filename || "").split("/").pop();
+    banner("页面出错了：" + e.message + "\n位置：" + f + " 第 " + e.lineno + " 行\n" +
+           "请按 Ctrl+F5 强制刷新；若仍有问题，把这段话告诉开发者。", "#c0392b");
+  });
+  // 2) 检测浏览器是否还在用旧缓存（沙箱/隐私模式下 localStorage 不可用，跳过）
+  try {
+    var ls = window.localStorage;
+    ls.setItem("__probe__", "1"); ls.removeItem("__probe__");
+    var old = ls.getItem("app_version");
+    if (old && old !== V) {
+      window.addEventListener("load", function () {
+        banner("检测到新版本，但浏览器可能仍在使用旧缓存。\n请按 Ctrl + F5 强制刷新一次即可。", "#e67e22");
+      });
+    }
+    ls.setItem("app_version", V);
+  } catch (e) {
+    // 存储不可用：不算错误，网站会自动转为内存模式
+  }
+})();
+</script>
+
+<div class="wrap">
+  <div id="app"></div>
+</div>
+
+<!-- 云服务 SDK（CDN）：用于「免密钥大模型」生成中文释义/例句。加载失败则自动回落内置词库 -->
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script src="js/data.js?v=20261015v"></script>
+<script src="js/grammar.js?v=20261015v"></script>
+<script src="js/curriculum.js?v=20261015v"></script>
+<script src="js/state.js?v=20261015v"></script>
+<script src="js/cloud-config.js?v=20261015v"></script>
+<script src="js/cloud-sync.js?v=20261015v"></script>
+<script src="js/wordlist.js?v=20261015v"></script>
+<script src="js/daily.js?v=20261015v"></script>
+<script src="js/app.js?v=20261015v"></script>
+</body>
+</html>

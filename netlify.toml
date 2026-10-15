@@ -1,0 +1,4 @@
+# Netlify 部署配置（拖文件夹即生效，无需构建）
+[build]
+  publish = "."
+  command = ""
