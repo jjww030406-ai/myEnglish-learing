@@ -66,19 +66,12 @@ function loadProfiles() {
   let list = null;
   try { list = JSON.parse(_sub(PROFILE_LIST_KEY)); } catch (e) { list = null; }
   if (!Array.isArray(list) || !list.length) {
-    list = [{ id: DEFAULT_PROFILE_ID, name: "我", goal: "日常交流", minutes: 15, createdAt: today() }];
-    _put(PROFILE_LIST_KEY, JSON.stringify(list));
+    const def = [{ id: DEFAULT_PROFILE_ID, name: "我", goal: "日常交流", minutes: 15, createdAt: today() }];
+    _put(PROFILE_LIST_KEY, JSON.stringify(def));
     _put(PROFILE_CUR_KEY, DEFAULT_PROFILE_ID);
+    return def;
   }
-  list = list.filter(p => p && typeof p.id === "string").map(p => ({
-    id: p.id,
-    name: (typeof p.name === "string" && p.name) ? p.name : "学习者",
-    goal: (typeof p.goal === "string" && p.goal) ? p.goal : "日常交流",
-    minutes: (typeof p.minutes === "number" && isFinite(p.minutes)) ? p.minutes : 15,
-    createdAt: (typeof p.createdAt === "string" && p.createdAt) ? p.createdAt : today()
-  }));
-  if (!list.length) list = [{ id: DEFAULT_PROFILE_ID, name: "我", goal: "日常交流", minutes: 15, createdAt: today() }];
-  return list;
+  return sanitizeProfiles(list);
 }
 function saveProfiles() { _put(PROFILE_LIST_KEY, JSON.stringify(PROFILES)); }
 
@@ -177,14 +170,13 @@ const GQ_KEY = "grammar_quiz_v1";
 try { gqState = JSON.parse(store.get(GQ_KEY)) || {}; } catch (e) { gqState = {}; }
 
 /* 从存储读取进度，并补齐旧版本缺失的字段。
-   任何一条脏数据都不允许让整页崩溃 —— 最坏情况只是丢进度，不能白屏。 */
-function load() {
+   任何一条脏数据都不允许让整页崩溃 —— 最坏情况只是丢进度，不能白屏。
+   normalize() 同时被「本地读取」和「云端恢复」复用。 */
+function normalize(d) {
   const base = { learned: [], stars: 0, quizBest: 0, days: [], todayCount: 0,
                  todayWords: [], date: today(), wrongWords: [], wrongStats: {},
                  lastReview: "", reviewSeen: "", wordStats: {}, phraseDone: [],
                  dayList: [], dayListDate: "", dayExtra: 0 };
-  let d = null;
-  try { d = JSON.parse(store.get(KEY)); } catch (e) { d = null; }
   if (!d || typeof d !== "object") return base;
 
   const arr = v => Array.isArray(v) ? v : [];
@@ -257,11 +249,59 @@ function load() {
     dayExtra:    num(d.dayExtra, 0)
   };
 }
+/* 本地读取：从当前档案键反序列化并规范化 */
+function load() {
+  let d = null;
+  try { d = JSON.parse(store.get(KEY)); } catch (e) { d = null; }
+  return normalize(d);
+}
+
+/* 从云端恢复：env = { profiles, current, S }。成功返回 true。
+   这样登录用户能把「多个档案 + 当前档案 + 进度」整体搬回另一台设备。 */
+function adoptCloud(env) {
+  if (!env || typeof env !== "object") return false;
+  try {
+    if (Array.isArray(env.profiles) && env.profiles.length) {
+      PROFILES = sanitizeProfiles(env.profiles);
+      profileId = (env.current && PROFILES.some(p => p.id === env.current))
+        ? env.current : PROFILES[0].id;
+      _put(PROFILE_LIST_KEY, JSON.stringify(PROFILES));
+      _put(PROFILE_CUR_KEY, profileId);
+    }
+    S = normalize(env.S);
+    KEY = keysFor(profileId)[0];
+    checkDay();
+    return true;
+  } catch (e) { return false; }
+}
+
+/* 把档案数组清洗成合法结构（本地读取与云端恢复共用） */
+function sanitizeProfiles(list) {
+  let arr = null;
+  try { arr = JSON.parse(typeof list === "string" ? list : JSON.stringify(list)); } catch (e) { arr = null; }
+  if (!Array.isArray(arr) || !arr.length) {
+    arr = [{ id: DEFAULT_PROFILE_ID, name: "我", goal: "日常交流", minutes: 15, createdAt: today() }];
+  }
+  arr = arr.filter(p => p && typeof p.id === "string").map(p => ({
+    id: p.id,
+    name: (typeof p.name === "string" && p.name) ? p.name : "学习者",
+    goal: (typeof p.goal === "string" && p.goal) ? p.goal : "日常交流",
+    minutes: (typeof p.minutes === "number" && isFinite(p.minutes)) ? p.minutes : 15,
+    createdAt: (typeof p.createdAt === "string" && p.createdAt) ? p.createdAt : today()
+  }));
+  if (!arr.length) arr = [{ id: DEFAULT_PROFILE_ID, name: "我", goal: "日常交流", minutes: 15, createdAt: today() }];
+  return arr;
+}
+
 function save() {
   store.set(KEY, JSON.stringify(S));
   // 云端同步（可选层）：配置了才推，且失败不影响本地保存。
+  // 登录后按云端用户 id 存整包（档案清单 + 当前档案 + 进度），换设备接着学。
   try {
-    if (window.CloudSync && window.CloudSync.enabled) window.CloudSync.saveProgress(profileId, S);
+    if (window.CloudSync && window.CloudSync.enabled) {
+      const key = (window.CloudSync.user && window.CloudSync.user.id) ? window.CloudSync.user.id : profileId;
+      window.CloudSync.saveProgress(key, { profiles: PROFILES, current: profileId, S: S });
+    }
   } catch (e) { /* 同步失败不阻断本地 */ }
 }
 function today() {
