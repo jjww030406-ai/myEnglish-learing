@@ -2987,6 +2987,13 @@ try {
 
 render();
 
+/* 云端内容（口语/阅读/语法）：若后端有 content_* 表，拉取并覆盖本地对应数组，
+   让这部分内容也能从后端扩充；表不存在/出错则继续用本地。
+   单词由 daily.js 独占装配（基础+种子+本地+云端共享，自动按词频扩充），此处不处理单词。 */
+if (window.CloudSync && window.CloudSync.enabled && window.CloudSync.loadContent) {
+  bootstrapContent();
+}
+
 /* 云端会话恢复：若之前登录过，自动拉取云端进度（失败则继续用本地） */
 if (window.CloudSync && window.CloudSync.enabled && window.CloudSync.restore()) {
   bootstrapCloud();
@@ -3012,6 +3019,20 @@ async function bootstrapCloud() {
     const data = await window.CloudSync.loadProgress(window.CloudSync.user.id);
     if (data && adoptCloud(data)) render();
   } catch (e) { console.error("云端恢复失败：", e); }
+}
+
+/* 从后端拉取内容并覆盖本地数组（单词/口语/阅读/语法）。
+   后端表不存在或出错时 loadContent 返回 null，这里直接跳过，继续用本地内容。 */
+async function bootstrapContent() {
+  try {
+    const c = await window.CloudSync.loadContent();
+    if (!c) return;
+    // 注意：单词不在此处覆盖，由 daily.js 统一装配（避免被覆盖）
+    if (c.content_phrases && c.content_phrases.length) PHRASES = c.content_phrases;
+    if (c.content_reading && c.content_reading.length) READING = c.content_reading;
+    if (c.content_grammar && c.content_grammar.length) GRAMMAR = c.content_grammar;
+    render();
+  } catch (e) { console.error("内容加载失败：", e); }
 }
 
 /* 打开登录/注册弹窗；已登录则打开账号卡片 */
