@@ -670,6 +670,8 @@ function bind() {
     b.onclick = () => { readShowCn = !readShowCn; render(); });
   document.querySelectorAll('[data-act="rdcheck"]').forEach(b =>
     b.onclick = () => checkReadFill());
+  document.querySelectorAll('[data-act="rdspeak"]').forEach(b =>
+    b.onclick = () => startReadSpeech());
   document.querySelectorAll(".review-start").forEach(b =>
     b.onclick = () => startReview());
   // 复习页·没错题时的空状态按钮
@@ -2764,6 +2766,9 @@ function readingUnlocked(lv) {
 function readBlanks(text) {
   const learned = new Set(S.learned || []);
   const known = new Set(WORDS.map(w => w.w));
+  // 词 → 释义 / 音标 查表：挖空处给用户看中文意思，可点 🔊 听发音
+  const wmap = {};
+  WORDS.forEach(w => { wmap[w.w.toLowerCase()] = w; });
   const tokens = text.split(/(\s+)/);
   let bi = 0;
   return tokens.map(tok => {
@@ -2775,7 +2780,17 @@ function readBlanks(text) {
     if (!blank && bi < 6 && known.has(low)) blank = true; // 学过的词不够时，用词库里见过的词补几个
     if (!blank || bi >= 8) return tok;
     bi++;
-    return `<input class="rd-blank" data-ans="${low}" maxlength="20" placeholder="?">${trail}`;
+    const w = wmap[low] || {};
+    const cn = w.cn || "";
+    const ph = w.ph || "";
+    const safe = low.replace(/'/g, "\\'");
+    return `<span class="rd-blk">
+      ${cn ? `<span class="rd-blk-cn">${cn}</span>` : ""}
+      <span class="rd-blk-box">
+        <input class="rd-blank" data-ans="${low}" data-ph="${ph}" placeholder="填单词" maxlength="20">
+        ${ph ? `<button type="button" class="rd-blk-spk" onclick="speak('${safe}')" title="听这个词的发音">🔊</button>` : ""}
+      </span>
+    </span>${trail}`;
   }).join("");
 }
 function viewRead() {
@@ -2808,11 +2823,14 @@ function viewRead() {
         <button class="chip ${readMode === "fill" ? "on" : ""}" data-readmode="fill">填单词</button>
       </span>
       <button class="mini" onclick="speak('${String(art.en).replace(/'/g, "\\'")}')">🔊 朗读</button>
+      ${hasSpeech() ? `<button class="mini" data-act="rdspeak" title="点我，然后大声朗读整段，我来听你读得对不对">🎤 跟读</button>` : ""}
     </div>
     ${readMode === "trans"
       ? `<button class="mini rd-allcn" data-act="rdallcn">${readShowCn ? "隐藏全部中文" : "显示全部中文"}</button>`
       : ""}
     ${body}
+    ${rdSr.active ? `<div class="ph-listening">🎤 正在听你朗读…</div>` : ""}
+    ${readCmpHtml()}
   </div>
   <div class="card">
     <button class="btn" data-readback="1">← 返回短文列表</button>
@@ -2851,6 +2869,50 @@ function checkReadFill() {
   });
   const el = document.getElementById("rdResult");
   if (el) el.textContent = total ? `填对 ${right} / ${total}` : "";
+}
+
+/* ---------- 阅读·语音跟读（听用户读整段，逐词标对错） ----------
+   复用口语页的 comparePhrase：把用户读到的词和原文逐词比对。
+   全对给表扬；有错则把读错的词列出来，每个都能 🔊 听正确读法 + 看音标。 */
+var rdSr = { active: false, heard: "", cmp: null };
+function startReadSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("当前浏览器不支持语音识别，请用 Chrome / Edge 打开本网站。"); return; }
+  if (rdSr.active) return;
+  rdSr.active = true; rdSr.heard = ""; rdSr.cmp = null; render();
+  let rec;
+  try { rec = new SR(); } catch (e) { rdSr.active = false; render(); return; }
+  rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    try { rdSr.heard = e.results[0][0].transcript; } catch (_) { rdSr.heard = ""; }
+    const art = READING[readId];
+    rdSr.cmp = art ? comparePhrase(art.en, rdSr.heard) : null;
+  };
+  rec.onerror = e => { rdSr.heard = "（没听清：" + (e && e.error ? e.error : "请再试一次") + "）"; };
+  rec.onend = () => { rdSr.active = false; render(); };
+  try { rec.start(); } catch (e) { rdSr.active = false; render(); }
+}
+function readCmpHtml() {
+  if (!rdSr.cmp) return "";
+  const cmp = rdSr.cmp;
+  const wrong = cmp.words.filter(x => !x.ok);
+  const wmap = {}; WORDS.forEach(w => { wmap[w.w.toLowerCase()] = w; });
+  return `
+    <div class="rd-cmp ph-cmp">
+      <div class="ph-heard">你刚才读：<b>${_esc(rdSr.heard)}</b></div>
+      <div class="ph-words">${cmp.words.map(x => `<span class="cmp ${x.ok ? "ok" : "bad"}">${_esc(x.w)}</span>`).join(" ")}</div>
+      ${cmp.allOk
+        ? `<div class="ph-cmp-tip ok">✅ 太棒了！整段都读对了，发音很准，继续保持！</div>`
+        : `<div class="ph-cmp-tip bad">⚠️ 有 ${wrong.length} 个词没读准（上面红色划掉的就是）。下面逐个听正确读法、看音标，跟着读几遍再试：</div>
+           <div class="rd-wrong-list">${wrong.map(x => {
+              const w = wmap[x.w.toLowerCase()] || {};
+              return `<div class="rd-wrong-item">
+                <b>${_esc(x.w)}</b>
+                ${w.ph ? `<span class="rd-wrong-ph">${w.ph}</span>` : ""}
+                <button type="button" class="mini" onclick="speak('${_esc(x.w)}')">🔊 听正确读法</button>
+              </div>`;
+           }).join("")}</div>`}
+    </div>`;
 }
 
 /* ---------- 学习档案（多用户）----------
