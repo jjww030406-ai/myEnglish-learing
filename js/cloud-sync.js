@@ -122,6 +122,25 @@
         if (rows && rows[0] && rows[0].data) return rows[0].data;
         return null;
       } catch (e) { return null; }
+    },
+
+    /* ---- 内容读取（单词 / 口语 / 阅读 / 语法，存于后端，可随时扩充）----
+       表结构统一为：id 自增主键 + data jsonb（存完整内容对象）+ created_at。
+       匿名可读（RLS 关闭），所以前端能直接拉；表不存在 / 出错则返回 null，
+       由调用方回落到本地内置词库。 */
+    async loadContent() {
+      if (!ENABLED) return null;
+      var tables = ["content_words", "content_phrases", "content_reading", "content_grammar"];
+      var out = {};
+      try {
+        for (var i = 0; i < tables.length; i++) {
+          var res = await fetch(cfg.url + "/rest/v1/" + tables[i] + "?select=*&order=id.asc", { headers: authHeaders() });
+          if (!res.ok) return null;            // 任一张表不存在 → 整体回落本地
+          var rows = await res.json();
+          out[tables[i]] = (rows || []).map(function (r) { return r.data; }).filter(Boolean);
+        }
+        return out;
+      } catch (e) { return null; }
     }
   };
 
