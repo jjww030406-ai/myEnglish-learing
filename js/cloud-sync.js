@@ -67,7 +67,14 @@
           method: "POST", headers: authHeaders(),
           body: JSON.stringify({ email: email, password: password })
         });
-        if (!res.ok) return { ok: false, msg: "邮箱或密码不正确" };
+        if (!res.ok) {
+          // 登录失败：先判断是否「邮箱未验证」，给出明确指引而非笼统的密码错误
+          try { var lt = (await res.text()) || ""; } catch (e) { var lt = ""; }
+          if (/not confirmed|email.*confirm|unconfirmed|Email not verified/i.test(lt)) {
+            return { ok: false, msg: "邮箱还没验证，请先到邮箱点击验证链接，再回来登录" };
+          }
+          return { ok: false, msg: "邮箱或密码不正确" };
+        }
         var j = await res.json();
         this.token = j.access_token || null;
         this.user = j.user || { email: email };
