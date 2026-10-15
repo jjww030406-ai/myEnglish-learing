@@ -43,8 +43,21 @@
           method: "POST", headers: authHeaders(),
           body: JSON.stringify({ email: email, password: password })
         });
-        if (!res.ok) return { ok: false, msg: "注册失败（" + res.status + "）" };
-        return { ok: true };
+        if (!res.ok) {
+          // 400 通常是「该邮箱已注册」
+          if (res.status === 400) {
+            try { var t = (await res.text()) || ""; } catch (e) { var t = ""; }
+            if (/already registered|already been registered|User already/i.test(t)) {
+              return { ok: false, msg: "该邮箱已注册，请直接登录" };
+            }
+            return { ok: false, msg: "邮箱格式有误或已被占用" };
+          }
+          return { ok: false, msg: "注册失败（" + res.status + "）" };
+        }
+        var j = await res.json();
+        // 若开启了邮箱验证，注册后用户处于未验证状态，需要去邮箱点链接
+        var needConfirm = !!(j && j.user && !j.user.email_confirmed_at);
+        return { ok: true, needConfirm: needConfirm };
       } catch (e) { return { ok: false, msg: "网络错误：" + e.message }; }
     },
     async login(email, password) {
