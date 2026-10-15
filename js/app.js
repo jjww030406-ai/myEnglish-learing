@@ -2990,22 +2990,36 @@ function openCloudModal() {
       document.getElementById("cmsg").textContent = "";
     };
   });
+  function switchTab(t) {
+    tab = t;
+    mask.querySelectorAll(".seg-btn").forEach(function (x) { x.classList.toggle("active", x.dataset.tab === t); });
+    document.getElementById("csubmit").textContent = t === "login" ? "登录" : "注册";
+    document.getElementById("cmsg").textContent = "";
+  }
   document.getElementById("csubmit").onclick = async function () {
     const email = (document.getElementById("cemail").value || "").trim();
     const pwd = document.getElementById("cpwd").value || "";
     const msg = document.getElementById("cmsg");
     if (!email || !pwd) { msg.textContent = "请填写邮箱和密码"; return; }
     msg.textContent = "处理中…";
-    const r = tab === "login"
-      ? await window.CloudSync.login(email, pwd)
-      : await window.CloudSync.signup(email, pwd);
-    if (r.ok) {
-      close();
-      await bootstrapCloud();
-      render();
-    } else {
-      msg.textContent = r.msg || "操作失败，请重试";
+    if (tab === "signup") {
+      const sr = await window.CloudSync.signup(email, pwd);
+      if (!sr.ok) { msg.textContent = sr.msg || "注册失败"; return; }
+      if (sr.needConfirm) {
+        msg.textContent = "注册成功！请先到邮箱点击验证链接，再回来登录。";
+        switchTab("login");
+        return;
+      }
+      // 注册成功且无需验证 → 自动登录，免去二次操作
+      const lr = await window.CloudSync.login(email, pwd);
+      if (lr.ok) { close(); await bootstrapCloud(); render(); return; }
+      msg.textContent = lr.msg || "注册成功，请直接登录";
+      switchTab("login");
+      return;
     }
+    const r = await window.CloudSync.login(email, pwd);
+    if (r.ok) { close(); await bootstrapCloud(); render(); }
+    else { msg.textContent = r.msg || "操作失败，请重试"; }
   };
 }
 
