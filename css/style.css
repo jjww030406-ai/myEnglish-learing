@@ -1399,3 +1399,23 @@ h2 { letter-spacing: .4px; }
 .ph-cmp-tip { margin-top:6px; font-size:13px; font-weight:700; }
 .ph-cmp-tip.ok { color:#1e8449; }
 .ph-cmp-tip.bad { color:#c0392b; }
+
+/* ===== 云端登录/注册弹窗 ===== */
+.modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+  align-items:center; justify-content:center; z-index:9999; padding:16px; }
+.modal { background:#fff; border-radius:16px; max-width:360px; width:100%; padding:22px;
+  position:relative; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+.modal-x { position:absolute; top:10px; right:12px; border:none; background:none;
+  font-size:22px; line-height:1; color:#888; cursor:pointer; }
+.modal h3 { margin:0 0 6px; }
+.modal .muted { color:#888; font-size:13px; margin:0 0 14px; }
+.modal .seg { display:flex; gap:8px; margin-bottom:12px; }
+.modal .seg-btn { flex:1; padding:8px; border:1px solid #e2e2e2; background:#f7f7f7;
+  border-radius:10px; cursor:pointer; font-size:14px; }
+.modal .seg-btn.active { background:#2d7d46; color:#fff; border-color:#2d7d46; }
+.modal-input { width:100%; box-sizing:border-box; padding:11px 12px; margin-bottom:10px;
+  border:1px solid #ddd; border-radius:10px; font-size:15px; }
+.modal-btn { width:100%; padding:12px; border:none; border-radius:10px; background:#2d7d46;
+  color:#fff; font-size:15px; cursor:pointer; }
+.modal-btn:hover { background:#256739; }
+.modal-msg { margin-top:10px; font-size:13px; color:#c0392b; min-height:18px; text-align:center; }
