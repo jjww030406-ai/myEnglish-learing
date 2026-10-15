@@ -229,11 +229,11 @@
       saveLib(lib);
       sbUpsert(fresh);                          // 写回云端共享词库，其他用户也能用
     }
+    applyWords(lib);
     window.DAILY_INFO = {
       status: "ok",
-      text: "🌐 今日新增 " + fresh.length + " 个单词 · 词库共 " + (WORDS.length + fresh.length) + " 词（每天自动补充）"
+      text: "🌐 今日新增 " + fresh.length + " 个单词 · 词库共 " + WORDS.length + " 词（每天自动补充）"
     };
-    applyWords(lib);
     safeRender();
     return { words: WORDS, info: window.DAILY_INFO };
   }
