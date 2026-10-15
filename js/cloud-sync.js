@@ -33,6 +33,7 @@
     enabled: ENABLED,
     token: null,
     user: null,
+    _sessKey: "english_cloud_session",
 
     /* ---- 账户（仅云端模式使用）---- */
     async signup(email, password) {
@@ -57,17 +58,33 @@
         var j = await res.json();
         this.token = j.access_token || null;
         this.user = j.user || { email: email };
+        this._persist();
         return { ok: true };
       } catch (e) { return { ok: false, msg: "网络错误：" + e.message }; }
     },
-    logout() { this.token = null; this.user = null; },
+    logout() { this.token = null; this.user = null; this._clear(); },
+
+    /* 把登录态存到本地，刷新页面后自动恢复（仍可继续用云端进度） */
+    _persist() {
+      try { window.localStorage.setItem(this._sessKey, JSON.stringify({ token: this.token, user: this.user })); } catch (e) {}
+    },
+    _clear() {
+      try { window.localStorage.removeItem(this._sessKey); } catch (e) {}
+    },
+    restore() {
+      try {
+        var s = JSON.parse(window.localStorage.getItem(this._sessKey));
+        if (s && s.token) { this.token = s.token; this.user = s.user || null; return true; }
+      } catch (e) {}
+      return false;
+    },
 
     /* ---- 进度读写（每个档案一份）---- */
-    // profileId 即本地档案 id；用 key 区分不同客户。
+    // profileId 即云端用户 id；用 key 区分不同客户。整包（档案+进度）upsert。
     async saveProgress(profileId, state) {
       if (!ENABLED) return false;
       try {
-        await fetch(cfg.url + "/rest/v1/" + cfg.table + "?profile_id=eq." + encodeURIComponent(profileId), {
+        await fetch(cfg.url + "/rest/v1/" + cfg.table, {
           method: "POST",
           headers: dataHeaders(),
           body: JSON.stringify({ profile_id: profileId, data: state, updated_at: new Date().toISOString() })
