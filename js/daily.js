@@ -77,6 +77,19 @@
     } catch (e) { return null; }
   }
 
+  /* ---------------- 网络：免费翻译 API（中文兜底，零依赖、无需 key、CORS 开放） ---------------- */
+  async function fetchCn(w) {
+    try {
+      var r = await fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(w) + "&langpair=en|zh-CN");
+      if (!r.ok) return null;
+      var d = await r.json();
+      var t = d && d.responseData && d.responseData.translatedText;
+      // 过滤掉配额/警告占位文本；正常中文释义才采用
+      if (t && d.responseStatus === 200 && !/MYMEMORY|QUOTA|WARNING|WE COULD NOT/i.test(t)) return String(t).trim();
+      return null;
+    } catch (e) { return null; }
+  }
+
   /* ---------------- 网络：大模型补全中文（可选） ---------------- */
   async function getModel() {
     try {
@@ -216,6 +229,7 @@
       var w = need[i];
       var dict = await fetchDict(w);
       var extra = (seed[w]) || null;
+      if (!extra) { var cn = await fetchCn(w); if (cn) extra = { cn: cn }; }   // 翻译 API：中文零依赖兜底
       if (!extra && cloud) { var g = await genCn(dict || { w: w }); if (g) extra = g; }
       if (!dict && !extra) continue;            // 连词典都查不到，跳过这个词
       var entry = assemble(w, dict, extra || {});
