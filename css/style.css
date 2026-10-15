@@ -1373,11 +1373,21 @@ h2 { letter-spacing: .4px; }
 .rd-en { font-size:16px; line-height:1.9; color:var(--txt); font-weight:600; }
 .rd-cn { color:var(--muted); margin-top:4px; line-height:1.8; }
 .rd-toggle { margin-top:4px; }
-.rd-fill { font-size:17px; line-height:2.2; color:var(--txt); }
-.rd-blank { width:84px; font:inherit; font-size:15px; padding:2px 8px; margin:0 2px;
-  border:1px solid var(--brand); border-radius:8px; text-align:center; outline:none; color:var(--brand-d); background:#fff; }
+.rd-fill { font-size:17px; line-height:2.5; color:var(--txt); }
+.rd-blk { display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 3px; }
+.rd-blk-cn { font-size:11px; color:var(--muted); line-height:1.25; margin-bottom:3px; max-width:100px; text-align:center; }
+.rd-blk-box { display:inline-flex; align-items:center; gap:3px; }
+.rd-blank { width:88px; font:inherit; font-size:15px; padding:3px 8px; border:1.5px solid var(--line); border-radius:7px; background:#fff; text-align:center; }
+.rd-blank::placeholder { color:#b9c0cf; }
+.rd-blank:focus { outline:none; border-color:var(--brand); }
 .rd-blank.ok { border-color:#27ae60; background:#eafff0; color:#1e8449; }
 .rd-blank.bad { border-color:#e74c3c; background:#ffecec; color:#c0392b; }
+.rd-blk-spk { border:none; background:var(--brand2); border-radius:7px; cursor:pointer; padding:4px 6px; font-size:13px; line-height:1; }
+.rd-blk-spk:hover { background:var(--brand); }
+.rd-cmp { margin-top:12px; }
+.rd-wrong-list { margin-top:10px; display:flex; flex-direction:column; gap:7px; }
+.rd-wrong-item { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; }
+.rd-wrong-ph { color:var(--muted); font-size:13px; }
 .rd-actions { display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap; }
 .rd-result { font-weight:700; color:var(--brand-d); }
 
