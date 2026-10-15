@@ -304,7 +304,7 @@ const PROVERBS = [
 ];
 
 /* ===== 日常口语 ===== */
-const PHRASES = [
+var PHRASES = [
   { en: "How are you?", cn: "你好吗？", ph: "/haʊ ɑːr juː/", tip: "回答几乎都是 I'm fine, thank you." },
   { en: "I'm fine, thank you.", cn: "我很好，谢谢。", ph: "/aɪm faɪn θæŋk juː/", tip: "万能回答" },
   { en: "Nice to meet you.", cn: "很高兴认识你。", ph: "/naɪs tə miːt juː/", tip: "初次见面专用" },
@@ -387,7 +387,7 @@ var BASE_WORDS = WORDS.slice();
    每条短文带 level：lv 越大越难。阅读页按用户「已掌握词数」逐步解锁，
    学到一定程度才出现更难的短文（对应路线图里 s14「开始读短文」）。
    en=英文  cn=整段中文翻译  topic=主题 */
-const READING = [
+var READING = [
   { lv: 1, topic: "打招呼 · 自我介绍", title: "My name is Tom",
     en: "Hello. My name is Tom. I am a student. I like my school. My friend is Li. We are happy.",
     cn: "你好。我的名字是汤姆。我是一名学生。我喜欢我的学校。我的朋友是李。我们很开心。" },
