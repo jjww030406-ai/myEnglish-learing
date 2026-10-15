@@ -427,7 +427,7 @@ function render() {
       <div class="chips">
         <button class="chip chip-me" data-chip="me" title="查看我的学习记录">👤 ${curProfile().name} ›</button>
         <button class="chip chip-star" data-chip="me" title="⭐ 星星：每完成一轮「今日目标」（例如今天练满 ${dailyGoal} 个词、或做完一次语法自测）就 +1 颗，用来记录你的努力。点开看「我的」页了解详情">⭐ 星星 ${S.stars}</button>
-        ${window.CloudSync && window.CloudSync.enabled ? `<span class="chip chip-cloud" title="进度已同步到云端，换设备也能接着学">☁ 云端</span>` : ""}
+        ${window.CloudSync && window.CloudSync.enabled ? `<button class="chip chip-cloud" data-chip="cloud" title="${window.CloudSync.user ? '已登录 ' + (window.CloudSync.user.email || '') + ' · 点开可退出/管理' : '点此登录或注册，进度存云端、换设备接着学'}">☁ ${window.CloudSync.user ? (window.CloudSync.user.email || '已同步') : '登录同步'}</button>` : ""}
         <button class="chip chip-fire fire-lv-${fireLevel(streakDays())}" data-chip="calendar" title="连续打卡天数 · 火花越久越亮（灰→橙→红→紫→金）。点开看「学习日历」：哪天学了、哪天没学一目了然">🔥 连续 ${streakDays()} 天</button>
         <button class="chip chip-today" data-chip="today" title="今天该学哪些词、哪些句子，哪些还没学">今日 ${TC.done}/${TC.total} ›</button>
       </div>
@@ -575,7 +575,7 @@ function bind() {
 
   // 顶部品牌栏里的「👤 我」：点进去看自己的学习记录（天数 / 单词 / 口语句子 …）
   document.querySelectorAll("[data-chip]").forEach(b =>
-    b.onclick = () => goView(b.dataset.chip));
+    b.onclick = () => { if (b.dataset.chip === "cloud") openCloudModal(); else goView(b.dataset.chip); });
 
   // 首页「今日词单」：点某个词 → 单词卡直接翻到它
   document.querySelectorAll("[data-word]").forEach(b =>
@@ -2925,6 +2925,11 @@ try {
 
 render();
 
+/* 云端会话恢复：若之前登录过，自动拉取云端进度（失败则继续用本地） */
+if (window.CloudSync && window.CloudSync.enabled && window.CloudSync.restore()) {
+  bootstrapCloud();
+}
+
 /* 启动：先立即渲染（用内置基础词库 + 「生成中」横幅），
    再异步去联网抓取/生成今日单词，完成后会自动再渲染一次。
    本地直接打开（file://）或离线时，云服务会因域名不匹配而失败，
@@ -2933,4 +2938,97 @@ if (window.DailyEngine && window.DailyEngine.loadDailyWords) {
   window.DailyEngine.loadDailyWords().catch(function (e) {
     console.error("每日单词加载失败：", e);
   });
+}
+
+/* =====================================================================
+   云端账号：登录 / 注册 / 退出（进度存 Supabase，换设备接着学）
+   ===================================================================== */
+/* 登录后拉取该用户整包进度（档案清单 + 当前档案 + 学习数据）并应用 */
+async function bootstrapCloud() {
+  if (!window.CloudSync || !window.CloudSync.user) return;
+  try {
+    const data = await window.CloudSync.loadProgress(window.CloudSync.user.id);
+    if (data && adoptCloud(data)) render();
+  } catch (e) { console.error("云端恢复失败：", e); }
+}
+
+/* 打开登录/注册弹窗；已登录则打开账号卡片 */
+function openCloudModal() {
+  if (!(window.CloudSync && window.CloudSync.enabled)) {
+    alert("云端同步尚未启用（需要在 cloud-config.js 配置 Supabase 后才会生效）。");
+    return;
+  }
+  if (window.CloudSync.user) { showCloudAccount(); return; }
+
+  const mask = document.createElement("div");
+  mask.className = "modal-mask";
+  mask.innerHTML =
+    '<div class="modal cloud-modal">' +
+      '<button class="modal-x" data-close="1">×</button>' +
+      '<h3>☁ 云端同步</h3>' +
+      '<p class="muted">注册一个账号，学习进度就会存到云端，换手机 / 电脑登录同一账号即可接着学。</p>' +
+      '<div class="seg">' +
+        '<button class="seg-btn active" data-tab="login">登录</button>' +
+        '<button class="seg-btn" data-tab="signup">注册</button>' +
+      '</div>' +
+      '<input id="cemail" class="modal-input" type="email" placeholder="邮箱" autocomplete="email">' +
+      '<input id="cpwd" class="modal-input" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">' +
+      '<button id="csubmit" class="modal-btn">登录</button>' +
+      '<div id="cmsg" class="modal-msg"></div>' +
+    '</div>';
+  document.body.appendChild(mask);
+  const close = function () { mask.remove(); };
+  mask.addEventListener("click", function (e) {
+    if (e.target === mask || e.target.dataset.close) close();
+  });
+  let tab = "login";
+  mask.querySelectorAll(".seg-btn").forEach(function (b) {
+    b.onclick = function () {
+      tab = b.dataset.tab;
+      mask.querySelectorAll(".seg-btn").forEach(function (x) { x.classList.toggle("active", x === b); });
+      document.getElementById("csubmit").textContent = tab === "login" ? "登录" : "注册";
+      document.getElementById("cmsg").textContent = "";
+    };
+  });
+  document.getElementById("csubmit").onclick = async function () {
+    const email = (document.getElementById("cemail").value || "").trim();
+    const pwd = document.getElementById("cpwd").value || "";
+    const msg = document.getElementById("cmsg");
+    if (!email || !pwd) { msg.textContent = "请填写邮箱和密码"; return; }
+    msg.textContent = "处理中…";
+    const r = tab === "login"
+      ? await window.CloudSync.login(email, pwd)
+      : await window.CloudSync.signup(email, pwd);
+    if (r.ok) {
+      close();
+      await bootstrapCloud();
+      render();
+    } else {
+      msg.textContent = r.msg || "操作失败，请重试";
+    }
+  };
+}
+
+/* 已登录：账号卡片 + 退出 */
+function showCloudAccount() {
+  const mask = document.createElement("div");
+  mask.className = "modal-mask";
+  mask.innerHTML =
+    '<div class="modal cloud-modal">' +
+      '<button class="modal-x" data-close="1">×</button>' +
+      '<h3>☁ 已同步到云端</h3>' +
+      '<p>当前账号：<b>' + (window.CloudSync.user.email || "已登录") + '</b></p>' +
+      '<p class="muted">学习进度会自动存到云端；换设备登录同一账号即可接着学。本地进度也会同时保留。</p>' +
+      '<button id="clogout" class="modal-btn">退出登录</button>' +
+    '</div>';
+  document.body.appendChild(mask);
+  const close = function () { mask.remove(); };
+  mask.addEventListener("click", function (e) {
+    if (e.target === mask || e.target.dataset.close) close();
+  });
+  document.getElementById("clogout").onclick = function () {
+    window.CloudSync.logout();
+    close();
+    render();
+  };
 }
