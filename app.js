@@ -1,0 +1,2936 @@
+const $ = (s) => document.querySelector(s);
+const app = $("#app");
+
+const VIEWS = {
+  home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
+  phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
+  today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead
+};
+
+/* 每个功能页的「页面头」元信息：图标、标题、副标题。
+   sub 用实时数据（词库/语法/口语条数都会随版本增长），不再写死。 */
+const PAGE_META = {
+  spell:   { icon: "⌨️", title: "拼写练习", sub: "看中文，一个字母一个字母敲出英文" },
+  cards:   { icon: "🃏", title: "单词卡",   sub: "看中文、例句、词性与单复数" },
+  etymon:  { icon: "📖", title: "词源词典", sub: WORDS.filter(w => w.root).length + " 个词的故事，知道为什么是这个意思" },
+  grammar: { icon: "📚", title: "语法课",   sub: GRAMMAR.length + " 节零基础语法，每节配自测" },
+  phrases: { icon: "💬", title: "口语",     sub: PHRASES.length + " 句日常口语，每句讲清用法" },
+  quiz:    { icon: "✍️", title: "测验",     sub: "10 道中→英选择题，检验成果" },
+  me:      { icon: "📈", title: "我的",     sub: "学习记录、星星、打卡与错词本" },
+  today:   { icon: "📅", title: "今日任务", sub: "今天该学哪些词、哪些句子，哪些还没学" },
+  wrong:   { icon: "📕", title: "错题本",   sub: "拼错/答错的词，逐条订正才算掌握" },
+  review:  { icon: "🔁", title: "每日复习", sub: "先复习旧词再学新词，错词优先" },
+  calendar:{ icon: "📅", title: "学习日历", sub: "哪天学了、哪天没学，连续打卡一目了然" },
+  read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" }
+};
+
+/* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
+function pageHead(meta) {
+  const accent = view === "today" ? "cards" : (view || "home");
+  return `<div class="page-head ph-${accent}">
+    <button class="back-home" data-back="home">← 返回首页</button>
+    <div class="ph-title">
+      <span class="ph-chip">${meta.icon}</span>
+      <span class="ph-text"><b>${meta.title}</b><small>${meta.sub}</small></span>
+    </div>
+  </div>`;
+}
+
+/* 跳转到某个视图（离开拼写页时清掉作答状态，避免输入框锁死残留） */
+function goView(next) {
+  if (view === "spell" && next !== "spell" && spChecked) {
+    spChecked = false; spResult = null; spInput = ""; spChars = []; spReveal = 0;
+  }
+  // 离开首页就收起吉祥物的话，回来是干净的（定时器也要一起清，否则会在别的页面上乱重绘）
+  if (next !== "home") {
+    mascotMsg = "";
+    if (mascotTimer)      { clearTimeout(mascotTimer);      mascotTimer = null; }
+    if (mascotLeaveTimer) { clearTimeout(mascotLeaveTimer); mascotLeaveTimer = null; }
+  }
+  view = next; flip = false; render();
+  // 换页后回到顶部：每个功能页唯一的去路是页面头上的「← 返回首页」。
+  // 如果沿用上一页的滚动位置（比如从首页下方的卡片点进来），用户会落在半中间、看不见返回按钮。
+  try {
+    const de = document.documentElement;
+    const oldBehavior = de.style.scrollBehavior;
+    de.style.scrollBehavior = "auto";       // 换页用瞬时定位，不做平滑滚动动画
+    window.scrollTo(0, 0);
+    de.style.scrollBehavior = oldBehavior;
+  } catch (e) { /* 滚动不可用不影响功能 */ }
+}
+
+/* 把一个词记进「今天学会的词」清单（去重）。拼写对 / 看词卡点学会 都会触发。 */
+function markTodayWord(word) {
+  if (!Array.isArray(S.todayWords)) S.todayWords = [];
+  if (!S.todayWords.includes(word)) S.todayWords.push(word);
+}
+function findWord(w) { return WORDS.find(x => x.w === w) || null; }
+
+/* ---------- 错题本 ----------
+   错词记录：wrongWords 是主清单（曾拼错过的词），wrongStats 记细节。
+   拼错 → markWrongWord；之后哪次拼对了 → markFixedWord（标记"已订正"）。 */
+function markWrongWord(word) {
+  if (!word) return;
+  if (!Array.isArray(S.wrongWords)) S.wrongWords = [];
+  if (!S.wrongStats || typeof S.wrongStats !== "object") S.wrongStats = {};
+  if (!S.wrongWords.includes(word)) S.wrongWords.push(word);
+  const s = S.wrongStats[word] || { n: 0, last: "", fixed: "" };
+  s.n = (s.n || 0) + 1;
+  s.last = today();
+  s.fixed = "";                 // 又错了 → 重新回到"还没搞懂"
+  S.wrongStats[word] = s;
+}
+/* 拼对了一个原本在错题本里的词 → 标记为已订正（不删除，保留历史） */
+function markFixedWord(word) {
+  if (!word || !S.wrongStats || !S.wrongStats[word]) return false;
+  if (S.wrongStats[word].fixed) return false;
+  S.wrongStats[word].fixed = today();
+  return true;
+}
+function wrongStat(word) {
+  const s = (S.wrongStats || {})[word];
+  return s || { n: 1, last: "", fixed: "" };
+}
+/* 还没订正的错词（"自己还没搞懂的"） */
+function openWrongWords() {
+  return (S.wrongWords || []).filter(w => !(S.wrongStats && S.wrongStats[w] && S.wrongStats[w].fixed));
+}
+
+/* ---------- 学习方案（内部）----------
+   引擎读完你的实际进度后，决定"今天练多少、上哪节语法、练哪几句口语"。
+   文案里不会出现"第 3 阶段 / 共 10 阶段"这类路线图 —— 用户只看到今天。 */
+function grammarDoneFn() {
+  return function (i) { return !!(gqState && gqState[i] && gqState[i].done); };
+}
+function todayPlan_raw() {
+  if (typeof Curriculum === "undefined") {
+    return { wpd: 10, grammar: [], phrases: [], goal: "", index: 0, stage: { icon: "🌱", name: "入门期" }, remaining: 0, stagePct: 0 };
+  }
+  return Curriculum.today(masteredCount(), grammarDoneFn());
+}
+/* 把每日目标交给方案引擎：阶段不同，每天的词数不同（6 → 8 → 10 → 12） */
+function syncDailyGoal() {
+  const t = todayPlan_raw();
+  dailyGoal = t.wpd || 10;
+}
+
+/* =====================================================================
+   自适应学习引擎
+   ---------------------------------------------------------------------
+   让网站"根据你的学习进度调整"，而不是一尘不变。核心是每个词的
+   「掌握度」——由连续拼对次数决定。掌握度驱动三件事：
+     ① 出题内容：越不熟越常出现，已掌握的最后才出现
+     ② 难度建议：正确率够了就建议升难度，太差就建议退回去
+     ③ 首页「今日计划」与学习阶段：每天按你的实时数据重新生成
+   ===================================================================== */
+const EMPTY_WSTAT = { seen: 0, right: 0, wrong: 0, streak: 0, lastSeen: "", assisted: 0 };
+function wStat(word) {
+  const s = (S.wordStats || {})[word];
+  return s ? Object.assign({}, EMPTY_WSTAT, s) : Object.assign({}, EMPTY_WSTAT);
+}
+/* 记录一次练习结果。
+   assisted=true 表示"看了答案才拼对的"——见过答案不算真会，连对清零。 */
+function bumpWord(word, ok, assisted) {
+  if (!word) return;
+  if (!S.wordStats || typeof S.wordStats !== "object") S.wordStats = {};
+  const s = Object.assign({}, EMPTY_WSTAT, S.wordStats[word] || {});
+  s.seen++; s.lastSeen = today();
+  if (ok && !assisted)      { s.right++; s.streak++; }
+  else if (ok && assisted)  { s.assisted++; s.streak = 0; }
+  else                      { s.wrong++; s.streak = 0; }
+  S.wordStats[word] = s;
+}
+/* 掌握度 0~5：由"连续拼对次数"决定，0=没学过，5=已掌握 */
+function mastery(word) {
+  const s = wStat(word);
+  if (s.streak >= 3) return 5;
+  if (s.streak === 2) return 4;
+  if (s.streak === 1) return 3;
+  if (s.seen > 0) return 2;
+  // 只在单词卡点过「学会了」、还没在拼写里练过的：算"刚见过"
+  if ((S.learned || []).includes(word)) return 1;
+  return 0;
+}
+const MASTERY_LABEL = ["没学过", "刚见过", "待巩固", "差一点", "快熟了", "已掌握"];
+
+/* ---------- 「今日熟练掌握」的判定标准 ----------
+   一个词要算「今天真正掌握了」，四条必须同时满足：
+     ① 今天练过        —— lastSeen 是今天
+     ② 连续拼对 3 次   —— streak >= 3
+     ③ 全程没用提示    —— 没点过「提示一个字母」、没点过「看答案」
+     ④ 不在错题本里    —— 没有还没订正的错词记录
+   第 ③ 条不用单独判：bumpWord() 里只要 assisted（看了答案）就把 streak 清零，
+   所以 streak >= 3 本身就意味着最后这 3 次都是自己拼出来的。
+   只看「今天练过几个」不算掌握 —— 抄一遍答案也能凑数，这里卡的是连对次数。 */
+function isTodayMastered(w) {
+  const s = wStat(w);
+  if (s.lastSeen !== today()) return false;   // ①
+  if (s.streak < 3) return false;             // ② + ③
+  return !openWrongWords().includes(w);       // ④
+}
+/* ---------- 今日达标清单 ----------
+   一天之内固定不变。原因很实在：如果词单每次都「重新挑最该练的」，
+   你刚把一个词练到连对 3 次，它就被踢出清单、换一个新词进来，
+   于是「今天达标几个」永远停在 0 —— 看得见的目标才算目标。
+   所以：每天第一次打开时按当前进度算一次（错题 → 没学过 → 待巩固 → 已掌握），
+   当天就锁死这组词；达标了打勾留在原地，全部达标后可以先「再来一组」。 */
+function ensureDayList() {
+  const n = Math.max(1, dailyGoal);
+  const old = Array.isArray(S.dayList) ? S.dayList.filter(w => typeof w === "string" && findWord(w)) : [];
+  if (S.dayListDate !== today() || old.length === 0) {
+    S.dayListDate = today();
+    S.dayExtra = 0;
+    S.dayList = todayFocusWords(n).map(w => w.w);
+    save();
+    return S.dayList.slice();
+  }
+  return old;
+}
+function dayListWords() {
+  return ensureDayList().map(findWord).filter(Boolean);
+}
+/* 今天的达标账本：前面几组 + 当前这组 */
+function dayMasteredInfo() {
+  const list = dayListWords();
+  const cur = list.filter(w => isTodayMastered(w.w)).length;
+  const extra = (typeof S.dayExtra === "number" && S.dayExtra > 0) ? S.dayExtra : 0;
+  return {
+    list,
+    cur, curTotal: list.length,
+    done: extra + cur, total: extra + list.length,
+    all: list.length > 0 && cur === list.length
+  };
+}
+/* 今日达标清单里「已经熟练掌握」了几个（首页统计块 / 文案用） */
+function todayMasteredCount() { return dayMasteredInfo().done; }
+/* 当前这组全达标了 → 换下一组继续加练（前几组的成绩累加进 dayExtra） */
+function moreDayWords() {
+  const list = dayListWords();
+  S.dayExtra = ((typeof S.dayExtra === "number" && S.dayExtra > 0) ? S.dayExtra : 0) + list.length;
+  S.dayListDate = today();
+  S.dayList = todayFocusWords(Math.max(1, dailyGoal)).map(w => w.w);
+  save(); render();
+}
+/* 单个词的达标进度，给词单上的徽章用：返回 {ok, streak, need} */
+function masteryProgress(w) {
+  const s = wStat(w);
+  return { ok: isTodayMastered(w), streak: Math.min(3, s.streak || 0), need: 3, seen: s.seen || 0 };
+}
+
+/* ---------- 打卡统计：连续天数 vs 累计天数 ----------
+   S.days 里存的是「学过习的日期」，所以它的长度 = 累计学了几天；
+   连续天数要从今天（今天还没打卡就从昨天）往回数，断一天就停。 */
+function dayKey(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function streakDays() {
+  const set = new Set(S.days || []);
+  if (!set.size) return 0;
+  const d = new Date();
+  if (!set.has(dayKey(d))) d.setDate(d.getDate() - 1);   // 今天还没开始，别一早就显示 0 打击人
+  if (!set.has(dayKey(d))) return 0;                     // 昨天也没学 → 确实断了
+  let n = 0;
+  while (set.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function totalDays() { return (S.days || []).length; }
+
+/* 火花等级：连续天数越长，火花越「旺」（抖音式逐级变色）。
+   等级只由连续天数决定，颜色由 CSS 的 .fire-lv-N 控制。 */
+function fireLevel(n) {
+  if (n <= 0)  return 0;   // 灰：还没点燃
+  if (n < 3)   return 1;   // 橙：刚起步
+  if (n < 7)   return 2;   // 橙红：快一周
+  if (n < 14)  return 3;   // 红：满一周
+  if (n < 30)  return 4;   // 紫：满两周
+  if (n < 60)  return 5;   // 金：满一月
+  return 6;                // 彩：传奇
+}
+function fireLevelName(n) {
+  return ["还没点燃", "刚刚起步", "坚持中", "一周火花", "双周火花", "月度火花", "传奇火花"][fireLevel(n)];
+}
+
+/* 学习阶段：按"真正掌握的词数"（连对 3 次以上）划分。
+   不用"已学比例"，因为词库每天在长大，比例会让目标一直往后跑。 */
+function masteredCount() {
+  return WORDS.filter(w => mastery(w.w) === 5).length;
+}
+function stageInfo() {
+  const m = masteredCount();
+  if (m < 5) return { id: "begin", icon: "🌱", name: "入门期",
+    tip: "先把最常见的词练到脱口而出，别急着求多。" };
+  if (m < 20) return { id: "grow", icon: "🌿", name: "成长期",
+    tip: "试着加上「首字母」模式，让记忆从「看着认识」变成「能写出来」。" };
+  return { id: "pro", icon: "🌳", name: "熟练期",
+    tip: "重点放到订正错题和听写，追求「错题本清零」。" };
+}
+
+/* 某个模式的历史正确率（样本 < 5 不下结论） */
+function modeAcc(mode) {
+  try {
+    const b = JSON.parse(store.get("spelling_score_" + mode)) || { r: 0, w: 0 };
+    const t = b.r + b.w;
+    return t >= 5 ? b.r / t : null;
+  } catch (e) { return null; }
+}
+/* 难度建议：正确率够高就升级、太低就退回；返回 {to, why} 或 null */
+function recommendMode(mode) {
+  const cur = mode || spMode;
+  const order = ["cn", "letter", "dict"];
+  const i = order.indexOf(cur);
+  if (i < 0) return null;
+  const acc = modeAcc(cur);
+  if (acc == null) return null;
+  if (acc >= 0.9 && i < order.length - 1) {
+    return { to: order[i + 1], why: `你在「${modeName(cur)}」的正确率有 ${Math.round(acc * 100)}%，可以挑战「${modeName(order[i + 1])}」了。` };
+  }
+  if (acc < 0.5 && i > 0) {
+    return { to: order[i - 1], why: `「${modeName(cur)}」正确率只有 ${Math.round(acc * 100)}%，先退回「${modeName(order[i - 1])}」把基础打牢。` };
+  }
+  return null;
+}
+
+/* 自适应出题：按"该练程度"分桶挑选
+   错题（还没订正）→ 见过但没熟 → 全新词 → 已掌握（只用来凑数）
+   这样每个词出现的频率会随着你越来越熟而自动降低。 */
+function adaptiveQueue(n) {
+  const openSet = new Set(openWrongWords());
+  const b = { wrong: [], weak: [], fresh: [], solid: [] };
+  WORDS.forEach(w => {
+    const m = mastery(w.w);
+    if (openSet.has(w.w)) b.wrong.push(w);
+    else if (m === 0) b.fresh.push(w);
+    else if (m === 5) b.solid.push(w);
+    else b.weak.push(w);
+  });
+  const pick = [];
+  const take = (arr, k) => {
+    const room = Math.max(0, Math.min(k, n - pick.length));
+    shuffle(arr).slice(0, room).forEach(x => pick.push(x));
+  };
+  take(b.wrong, 4);      // 错题最多占 4 个，别一上来全是错题打击人
+  take(b.weak, n);       // 待巩固的吃掉剩余名额
+  take(b.fresh, n);      // 再补全新词
+  take(b.solid, n);      // 最后才用已掌握的词凑数
+  return shuffle(pick).slice(0, n);
+}
+/* ---------- 今日词单：今天该练哪几个词 ----------
+   优先级：没订正的错题 → 没学过 → 待巩固 → 已掌握（复习）。
+   同一天内结果稳定（用日期做种子排序），但你的掌握度一变，词单立刻跟着变 ——
+   所以「今天学什么」是进度算出来的，不是写死的那几个。 */
+function stableHash(s) {
+  let h = 0;
+  for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) >>> 0;
+  return h;
+}
+/* 当前阶段对应的「词带」：词库按难度排序（易→难），而课程各阶段的 need
+   正是累计词数门槛，所以直接用 need 把词库切成和阶段对齐的几段。
+   这样「每天练哪些词」也和语法/口语一样由阶段决定 —— 词库随进度实时解锁，
+   而不是固定从整份词里乱挑。 */
+function stageWordBand() {
+  const tp = Curriculum.today(masteredCount(), grammarDoneFn());
+  const i = tp.index;
+  const from = i > 0 ? CURRICULUM[i - 1].need : 0;
+  const to = CURRICULUM[i].need > 0 ? CURRICULUM[i].need : WORDS.length;
+  return [from, to];
+}
+function todayFocusWords(n) {
+  const [from, to] = stageWordBand();
+  const inBand = w => { const idx = WORDS.indexOf(w); return idx >= from && idx < to; };
+  const openSet = new Set(openWrongWords());
+  const pri = w => {
+    if (openSet.has(w.w)) return 0;
+    const m = mastery(w.w);
+    if (m === 0) return 1;
+    if (m <= 4) return 2;
+    return 3;
+  };
+  const seed = today();
+  // 先在本阶段词带里挑（按掌握度优先），挑不够再补其它未掌握词，保证当天总有得练。
+  const pool = WORDS.slice().sort((a, b) => {
+    const da = inBand(a) ? 0 : 1, db = inBand(b) ? 0 : 1;
+    if (da !== db) return da - db;
+    const d = pri(a) - pri(b);
+    if (d) return d;
+    return stableHash(a.w + seed) - stableHash(b.w + seed);
+  });
+  return pool.slice(0, Math.max(1, n));
+}
+/* 离下一阶段还差几个「已掌握」的词。
+   注意 tp.remaining 是「本阶段」剩余词数，词够了但本课测验没做完时它是 0 ——
+   这时人还在本阶段，不能说「已是最后阶段」。所以：
+     -1 = 已经是最后阶段； 0 = 词数够了，还差本课测验； >0 = 还差几个词 */
+function toNextStage() {
+  const tp = todayPlan_raw();
+  const last = (Curriculum.stages || []).length - 1;
+  if (tp.index >= last) return -1;
+  return tp.remaining || 0;
+}
+
+/* 本轮题目的构成，用于在拼写页展示"这一轮练的是什么" */
+function queueBreakdown(q) {
+  const openSet = new Set(openWrongWords());
+  const r = { wrong: 0, weak: 0, fresh: 0, solid: 0 };
+  (q || []).forEach(w => {
+    if (!w) return;
+    if (openSet.has(w.w)) r.wrong++;
+    else { const m = mastery(w.w); if (m === 0) r.fresh++; else if (m === 5) r.solid++; else r.weak++; }
+  });
+  return r;
+}
+
+/* 渲染。单个页面出错时只降级该页并提示，绝不让 bind() 中断
+   —— bind() 一旦抛错，后面所有按钮都不会绑定，表现就是"点了没反应"。*/
+function render() {
+  // 每次渲染都刷新一次时段：页面开着跨过整点也会自己换配色
+  try { document.documentElement.dataset.time = timeOfDay(); } catch (e) {}
+  try {
+    checkDay();
+  } catch (e) {
+    console.error("checkDay:", e);
+  }
+  try {
+    syncDailyGoal();          // 每日目标由学习方案引擎决定（会随阶段变化）
+  } catch (e) {
+    console.error("syncDailyGoal:", e);
+  }
+
+  const labels = {
+    home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
+    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读"
+  };
+
+  let body;
+  try {
+    body = (VIEWS[view] || viewHome)();
+  } catch (e) {
+    console.error("渲染页面出错 view=" + view, e);
+    body = `<div class="card">
+      <h3>⚠️ 这个页面出了点问题</h3>
+      <p class="muted">错误信息：${String(e && e.message || e)}</p>
+      <p class="muted">其他页面不受影响，可以继续使用。如果这个页面一直有问题，请按 Ctrl+F5 强制刷新。</p>
+    </div>`;
+  }
+
+  // 首页是「导航页」：用大卡片导航。
+  // 功能页只保留一个页面头（含「← 返回首页」），不再显示顶部模块切换条 ——
+  // 进入任何功能页后，唯一的去路就是返回首页，避免在页面之间横跳。
+  const head = view === "home" ? "" : pageHead(PAGE_META[view] || { icon: "📄", title: labels[view] || "页面", sub: "" });
+  // 顶部「今日」徽章用今日达标清单的进度（与页面里的清单同一个口径）
+  const TC = dayMasteredInfo();
+
+  // 顶部品牌栏只在首页显示：首页是门面，要有标题和进度徽章；
+  // 功能页则留白，最上面就是「← 返回首页」，不再有第二条横栏。
+  const top = view === "home" ? `
+    <header class="top">
+      <div class="brand">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></div>
+      <div class="chips">
+        <button class="chip chip-me" data-chip="me" title="查看我的学习记录">👤 ${curProfile().name} ›</button>
+        <button class="chip chip-star" data-chip="me" title="⭐ 星星：每完成一轮「今日目标」（例如今天练满 ${dailyGoal} 个词、或做完一次语法自测）就 +1 颗，用来记录你的努力。点开看「我的」页了解详情">⭐ 星星 ${S.stars}</button>
+        ${window.CloudSync && window.CloudSync.enabled ? `<span class="chip chip-cloud" title="进度已同步到云端，换设备也能接着学">☁ 云端</span>` : ""}
+        <button class="chip chip-fire fire-lv-${fireLevel(streakDays())}" data-chip="calendar" title="连续打卡天数 · 火花越久越亮（灰→橙→红→紫→金）。点开看「学习日历」：哪天学了、哪天没学一目了然">🔥 连续 ${streakDays()} 天</button>
+        <button class="chip chip-today" data-chip="today" title="今天该学哪些词、哪些句子，哪些还没学">今日 ${TC.done}/${TC.total} ›</button>
+      </div>
+    </header>` : "";
+
+  app.innerHTML = `
+    ${top}
+    ${head}
+    ${dailyBanner()}
+    <main>${body}</main>
+    ${store.available ? "" : `<div class="nowarn">
+      ⚠️ 当前环境无法保存进度（浏览器禁用了本地存储）。<br>
+      本次使用完全正常，但关掉页面后进度不会保留。<br>
+      <b>要正常记录进度，请双击电脑上的 index.html 文件打开，或运行「启动网站.bat」。</b>
+    </div>`}
+    <footer>今日单词由网络词典实时生成（经云服务），学习进度只保存在本机浏览器。</footer>
+  `;
+
+  // bind 单独兜底：即使某个绑定语句出错，也不影响已绑好的部分
+  try {
+    bind();
+  } catch (e) {
+    console.error("bind 出错", e);
+  }
+}
+
+/* 每日单词状态横幅（联网获取中 / 已就绪 / 离线回落） */
+/* ---------- 吉祥物互动 ----------
+   点一下猫头鹰：蹦一下 + 弹出一句话。话不是写死的，按「当前时段 + 你的进度」挑，
+   所以早中晚、有没有错题、今天练没练够，说的内容都不一样。 */
+var mascotMsg = "";      // 气泡文案（离开首页时清掉）
+var mascotFace = "🦉";   // 气泡里的小图标
+var mascotTap = 0;       // 点了几次：换动画用
+var mascotTimer = null;      // 说完自动收（6 秒）
+var mascotLeaveTimer = null; // 鼠标移开后收（0.4 秒）
+
+/* 收起气泡。三种情况下都会走到这里：
+   鼠标移开猫头鹰 / 自己去点别的地方 / 说完 6 秒自动收。
+   两个定时器分开：鼠标停在猫头鹰上可以慢慢看完那句话（取消"移开"的收起），
+   但"说完 6 秒"这条不受影响 —— 否则鼠标不小心压在上面，气泡就一直挂着不走了。 */
+function hideMascot() {
+  if (mascotTimer)      { clearTimeout(mascotTimer);      mascotTimer = null; }
+  if (mascotLeaveTimer) { clearTimeout(mascotLeaveTimer); mascotLeaveTimer = null; }
+  if (!mascotMsg) return;
+  mascotMsg = "";
+  render();
+}
+function armMascotTimer(ms) {
+  if (mascotTimer) clearTimeout(mascotTimer);
+  mascotTimer = setTimeout(hideMascot, ms);
+}
+function armMascotLeave(ms) {
+  if (mascotLeaveTimer) clearTimeout(mascotLeaveTimer);
+  mascotLeaveTimer = setTimeout(hideMascot, ms);
+}
+function cancelMascotLeave() {
+  if (mascotLeaveTimer) { clearTimeout(mascotLeaveTimer); mascotLeaveTimer = null; }
+}
+
+function tapMascot() {
+  const t = timeOfDay();
+  const wrong = openWrongWords().length;
+  const todayN = (S.todayWords || []).length;
+  const pool = [];
+  if (t === "night")   pool.push(["😴", "这么晚了，再学 15 分钟就去睡，别熬。"]);
+  if (t === "morning") pool.push(["🌅", "早上记性最好，趁现在练几个词。"]);
+  if (t === "dusk")    pool.push(["🌇", "晚上适合复习，把今天的词再过一遍。"],);
+  if (wrong > 0)       pool.push(["📕", `错题本里还有 ${wrong} 个词等你收拾。`]);
+  if (todayN >= dailyGoal) pool.push(["🎉", `今天的 ${dailyGoal} 个词练完了，漂亮！`]);
+  else pool.push(["⌨️", `今天还有 ${Math.max(0, dailyGoal - todayN)} 个词就达标了。`]);
+  pool.push(["💪", "每天 15 分钟，比一次猛学两小时管用。"]);
+  pool.push(["🦉", "我是你的学习搭档，随时点我聊两句。"]);
+  pool.push(["⭐", `你已经收集 ${S.stars} 颗星星了，继续。`]);
+  pool.push(["📈", `连续打卡 ${S.days.length} 天了，别断。`]);
+  const p = pool[Math.floor(Math.random() * pool.length)];
+  mascotFace = p[0]; mascotMsg = p[1]; mascotTap++;
+  render();
+  armMascotTimer(6000);   // 说完 6 秒自动收，不靠用户记得关
+}
+
+/* ---------- 每日一句（谚语 / 励志短句）----------
+   每次打开网站（登录）随机换一句，而不是「今天固定同一句」。
+   这样用户每次进来都能读到不一样的句子，保持新鲜感。
+   同一次会话内保持稳定（_provIdx 只在加载时取一次），不会在页面里跳来跳去。
+   中文意思一起显示 —— 零基础看不懂英文，等于白给一句。 */
+var _provIdx = -1;
+function todayProverb() {
+  const list = (typeof PROVERBS !== "undefined" && PROVERBS.length) ? PROVERBS : [{ en: "Practice makes perfect.", cn: "熟能生巧。" }];
+  if (_provIdx < 0 || _provIdx >= list.length) _provIdx = Math.floor(Math.random() * list.length);
+  return list[_provIdx];
+}
+function proverbHtml() {
+  const pv = todayProverb();
+  const safe = String(pv.en).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  return `<span class="hero-prov">
+    <span class="hp-lab">📜 每日一句</span>
+    <b class="hp-en">“${pv.en}”</b>
+    <span class="hp-cn">${pv.cn}</span>
+    <button class="mini hp-say" onclick="speak('${safe}')" title="听一遍">🔊</button>
+  </span>`;
+}
+
+/* 一天里的时段：决定首页 Hero 与整页背景的配色（见 css 里的 [data-time]） */
+function timeOfDay(h) {
+  const hr = (typeof h === "number") ? h : new Date().getHours();
+  // 注意要写成区间而不是「小于」：凌晨 0-4 点如果只判断 hr < 17，会被误判成白天
+  if (hr >= 5  && hr < 11) return "morning";   // 清晨 5-10
+  if (hr >= 11 && hr < 17) return "day";       // 白天 11-16
+  if (hr >= 17 && hr < 20) return "dusk";      // 傍晚 17-19
+  return "night";                              // 夜里 20-23 与凌晨 0-4
+}
+
+function dailyBanner() {
+  const i = window.DAILY_INFO || {};
+  if (!i.text) return "";
+  return `<div class="daily-banner ${i.status || ""}">${i.text}</div>`;
+}
+
+/* 有内容才渲染小节，避免大模型偶尔漏字段时屏幕上出现「undefined」 */
+function fbBlock(title, text, cls) {
+  if (!text) return "";
+  return `<h4>${title}</h4><p class="${cls || "why"}">${text}</p>`;
+}
+
+function bind() {
+  // 首页导航卡片：点卡片进入对应模块
+  document.querySelectorAll(".nav-card").forEach(b =>
+    b.onclick = () => goView(b.dataset.v));
+
+  // 点吉祥物：蹦一下 + 说一句话
+  // 鼠标移开就收起气泡（移回来则取消收起）；手机没有鼠标，靠 6 秒自动收兜底。
+  document.querySelectorAll("[data-mascot]").forEach(b => {
+    b.onclick = () => tapMascot();
+    b.onmouseenter = () => cancelMascotLeave();
+    b.onmouseleave = () => armMascotLeave(400);
+  });
+  // 点页面其他地方（除了猫头鹰本身）也收起气泡 —— 只绑一次，别每次 render 都叠加
+  if (!document.__mascotOutside) {
+    document.__mascotOutside = true;
+    document.addEventListener("click", e => {
+      const el = e.target && e.target.closest ? e.target.closest("[data-mascot]") : null;
+      if (!el) hideMascot();
+    });
+  }
+
+  // 顶部品牌栏里的「👤 我」：点进去看自己的学习记录（天数 / 单词 / 口语句子 …）
+  document.querySelectorAll("[data-chip]").forEach(b =>
+    b.onclick = () => goView(b.dataset.chip));
+
+  // 首页「今日词单」：点某个词 → 单词卡直接翻到它
+  document.querySelectorAll("[data-word]").forEach(b =>
+    b.onclick = () => { cardWord = b.dataset.word; goView("cards"); });
+
+  // 今日达标清单整组都打勾了 → 「再来一组」换下一批词继续加练
+  document.querySelectorAll("[data-act='morewords']").forEach(b =>
+    b.onclick = () => moreDayWords());
+
+  // 今日任务清单里每个板块的「去做」按钮
+  document.querySelectorAll(".td-go").forEach(b =>
+    b.onclick = () => goView(b.dataset.v));
+
+  // 首页「今日计划」里每条建议的按钮（带 data-lesson 的直接跳到那一课）
+  document.querySelectorAll(".pi-go").forEach(b =>
+    b.onclick = () => {
+      const lz = b.dataset.lesson;
+      if (lz !== undefined && lz !== null && lz !== "") {
+        lessonIdx = parseInt(lz, 10);
+        gqIdx = lessonIdx;
+        initGQuiz(lessonIdx);
+      }
+      goView(b.dataset.v);
+    });
+
+  // 首页「今日已学单词」/「错题待订正」统计块：点开对应清单
+  document.querySelectorAll(".hs-today").forEach(b =>
+    b.onclick = () => goView(b.dataset.v));
+  document.querySelectorAll(".hs-wrong").forEach(b =>
+    b.onclick = () => goView(b.dataset.v));
+
+  // 错题本「去拼写练习」：只把还没订正的错词排进队列，不混入其他词
+  const pw = $("#practiceWrong");
+  if (pw) pw.onclick = () => {
+    const list = openWrongWords().map(findWord).filter(Boolean).slice(0, 10);
+    if (!list.length) return;
+    spQueue = list;
+    spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+    spMode = "cn"; spLoad();
+    view = "spell"; render();
+  };
+
+  // 错题本里每个词的「再拼一遍这个词」：直接在拼写页只练这一个词
+  document.querySelectorAll(".wr-practice").forEach(b =>
+    b.onclick = () => practiceOneWord(b.dataset.practice));
+
+  // 「我的」页：跳转错题本 / 开始今日复习
+  const gw = $("#goWrong"); if (gw) gw.onclick = () => goView("wrong");
+  const gr = $("#goReview"); if (gr) gr.onclick = () => goView("review");
+
+  // 「我的」页：学习档案（切换 / 新建 / 删除）
+  document.querySelectorAll(".prof-item").forEach(b =>
+    b.onclick = () => {
+      if (b.dataset.prof === profileId) return;
+      if (switchProfile(b.dataset.prof)) render();
+    });
+  const ap = $("#addProf");
+  if (ap) ap.onclick = () => {
+    const inp = $("#newProfName");
+    const name = inp ? String(inp.value || "").trim() : "";
+    const id = addProfile(name);
+    if (switchProfile(id)) render();
+  };
+  const dp = $("#delProf");
+  if (dp) dp.onclick = () => {
+    if (PROFILES.length <= 1) return;
+    if (!confirm(`确定删除档案「${curProfile().name}」吗？它的全部学习进度都会被删除，且无法恢复。`)) return;
+    if (removeProfile(profileId)) render();
+  };
+
+  // 复习页：开始今天的复习
+  document.querySelectorAll("#startReview").forEach(b =>
+    b.onclick = () => startReview());
+
+  // 阅读页：列表 → 进入某篇；返回列表；切换模式；逐段/整段翻译；填词核对
+  document.querySelectorAll("[data-read]").forEach(b =>
+    b.onclick = () => { readId = b.dataset.read; readMode = "trans"; readShowCn = false; render(); });
+  document.querySelectorAll("[data-readback]").forEach(b =>
+    b.onclick = () => { readId = ""; render(); });
+  document.querySelectorAll("[data-readmode]").forEach(b =>
+    b.onclick = () => { readMode = b.dataset.readmode; render(); });
+  document.querySelectorAll("[data-rdt]").forEach(b =>
+    b.onclick = () => {
+      const p = b.closest(".rd-para");
+      const cn = p && p.querySelector(".rd-cn");
+      if (!cn) return;
+      const show = cn.style.display === "none";
+      cn.style.display = show ? "" : "none";
+      b.textContent = show ? "隐藏中文" : "显示中文";
+    });
+  document.querySelectorAll('[data-act="rdallcn"]').forEach(b =>
+    b.onclick = () => { readShowCn = !readShowCn; render(); });
+  document.querySelectorAll('[data-act="rdcheck"]').forEach(b =>
+    b.onclick = () => checkReadFill());
+  document.querySelectorAll(".review-start").forEach(b =>
+    b.onclick = () => startReview());
+  // 复习页·没错题时的空状态按钮
+  const rgs = $("#revGoSpell");
+  if (rgs) rgs.onclick = () => goView("spell");
+  const rgh = $("#revGoHome");
+  if (rgh) rgh.onclick = () => goView("home");
+  const sr = $("#skipReview");
+  if (sr) sr.onclick = () => { S.lastReview = today(); save(); goView("home"); };
+
+  // 功能页的「返回首页」按钮
+  document.querySelectorAll(".back-home").forEach(b =>
+    b.onclick = () => goView(b.dataset.back || "home"));
+
+  const c = $("#flipCard");
+  if (c) {
+    c.onclick = () => { flip = !flip; c.classList.toggle("flipped", flip); };
+  }
+  const l = $("#learnBtn");
+  if (l) l.onclick = () => {
+    const w = WORDS[currentWordIndex()];
+    if (!S.learned.includes(w.w)) {
+      S.learned.push(w.w);
+      S.todayCount++;
+      if (S.todayCount % dailyGoal === 0) S.stars++;
+      save();
+    }
+    markTodayWord(w.w);
+    nextCard();
+  };
+  const p = $("#prevBtn"), n = $("#nextBtn");
+  if (p) p.onclick = prevCard;
+  if (n) n.onclick = nextCard;
+  const ts = $("#toSpell");
+  if (ts) ts.onclick = () => {
+    const w = curCard || WORDS[currentWordIndex()];
+    spQueue = [w, ...shuffle(WORDS.filter(x => x.w !== w.w)).slice(0, 9)];
+    spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+    spMode = "cn"; spLoad();
+    view = "spell"; render();
+  };
+  const cl = $("#clearBtn");
+  if (cl) cl.onclick = () => {
+    if (confirm("确定要清空全部学习记录吗？此操作不可恢复。")) {
+      store.del(KEY); S = load(); view = "home"; render();
+    }
+  };
+  const cw = $("#clearWrong");
+  if (cw) cw.onclick = () => { S.wrongWords = []; save(); render(); };
+  // 口语：每句的「我会了 / ✅ 已会」，点了就记进进度（可再点取消）
+  document.querySelectorAll("[data-phrase]").forEach(b =>
+    b.onclick = () => togglePhrase(parseInt(b.dataset.phrase, 10)));
+  // 口语：🎤「说给我听」—— 语音识别，听用户读并对比找错
+  document.querySelectorAll("[data-mic]").forEach(b =>
+    b.onclick = () => startSpeech(parseInt(b.dataset.mic, 10)));
+  document.querySelectorAll("[data-grammar]").forEach(el =>
+    el.onclick = () => {
+      lessonIdx = parseInt(el.dataset.grammar);
+      gqIdx = lessonIdx;
+      initGQuiz(lessonIdx);      // 首次进入要先初始化作答记录
+      view = "grammar"; render();
+    });
+  // 语法课顶部「今天学这节」的直达按钮（与课程卡分开，避免和课程列表混在一起）
+  document.querySelectorAll("[data-goto]").forEach(el =>
+    el.onclick = () => {
+      lessonIdx = parseInt(el.dataset.goto);
+      gqIdx = lessonIdx;
+      initGQuiz(lessonIdx);
+      view = "grammar"; render();
+    });
+
+  /* 语法课 */
+  const bl = $("#backLessons"); if (bl) bl.onclick = () => { lessonIdx = null; render(); };
+  const pl = $("#prevLesson");
+  if (pl) pl.onclick = () => {
+    if (lessonIdx > 0) { lessonIdx--; gqIdx = lessonIdx; initGQuiz(lessonIdx); render(); }
+  };
+  const nl = $("#nextLesson");
+  if (nl) nl.onclick = () => {
+    if (lessonIdx < GRAMMAR.length - 1) { lessonIdx++; gqIdx = lessonIdx; initGQuiz(lessonIdx); render(); }
+  };
+  document.querySelectorAll("[data-gq]").forEach(b =>
+    b.onclick = () => pickGQuiz(b.dataset.gq.split(":")[0], b.dataset.gq.split(":")[1]));
+  const gqs = $("#gqSubmit"); if (gqs) gqs.onclick = submitGQuiz;
+  const gqr = $("#gqRedo");
+  if (gqr) gqr.onclick = () => startGQuiz(lessonIdx);
+  const gqb = $("#gqBackRead");
+  if (gqb) gqb.onclick = () => {
+    const b = document.querySelector(".lesson-page");
+    if (b) b.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const gqh = $("#gqHide");
+  if (gqh) gqh.onclick = () => {
+    const box = $("#gquizBox");
+    if (box) box.classList.toggle("blind");
+    gqh.textContent = gqh.textContent === "先遮住答案自测" ? "显示选项" : "先遮住答案自测";
+  };
+
+  /* 拼写练习事件 —— 每个都单独 try，任何一个失败都不影响其他按钮 */
+  const safe = (id, fn, label) => {
+    const el = $(id);
+    if (!el) return;
+    el.onclick = (ev) => {
+      try { if (ev && ev.preventDefault) ev.preventDefault(); fn(); }
+      catch (e) {
+        console.error(label + " 出错", e);
+        alert("「" + label + "」执行出错：" + (e && e.message || e));
+      }
+    };
+  };
+  document.querySelectorAll("[data-mode]").forEach(el => {
+    el.onclick = () => { spMode = el.dataset.mode; spQueue = []; render(); };
+  });
+  const si = $("#spInput");
+  if (si) {
+    /* 完全自行接管按键。
+       为什么不能依赖浏览器默认的插入行为？因为格子是定长的，
+       在第 1 格打字会把后面的字母整体挤右移一位 —— 对拼写是错的。
+       这里统一拦截字母键，直接写入 spChars[spCursor]，绝不移动其他格。 */
+    si.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (spChecked) safe2(spNext, "下一题");
+        else if (spRetry) safe2(spRetryCheck, "我拼好了");
+        else safe2(spCheck, "检查");
+        return;
+      }
+      const len = spWord ? spWord.w.length : 0;
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        if (spCursor > 0) { spChars[spCursor - 1] = ""; spCursor -= 1; }
+        else spChars[0] = "";
+        syncSlots(); syncCapture();
+        return;
+      }
+      if (e.key === "Delete") {
+        e.preventDefault();
+        spChars[spCursor] = "";
+        syncSlots(); syncCapture();
+        return;
+      }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); spCursor = Math.max(0, spCursor - 1); syncSlots(); syncCapture(); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); spCursor = Math.min(len, spCursor + 1); syncSlots(); syncCapture(); return; }
+      if (e.key === "Home") { e.preventDefault(); spCursor = 0; syncSlots(); syncCapture(); return; }
+      if (e.key === "End")  { e.preventDefault(); spCursor = len; syncSlots(); syncCapture(); return; }
+      // 字母：写入当前格，光标右移，不影响其他格
+      if (/^[a-zA-Z]$/.test(e.key)) {
+        e.preventDefault();
+        if (spCursor < len) {
+          spChars[spCursor] = e.key.toLowerCase();
+          spCursor += 1;
+        }
+        syncSlots(); syncCapture();
+      }
+    };
+    /* 粘贴：把字母依次填入从光标开始的格子 */
+    si.onpaste = (e) => {
+      e.preventDefault();
+      const txt = (e.clipboardData && e.clipboardData.getData("text") || "")
+        .toLowerCase().replace(/[^a-z]/g, "");
+      const len = spWord ? spWord.w.length : 0;
+      for (let i = 0; i < txt.length && spCursor + i < len; i++) {
+        spChars[spCursor + i] = txt[i];
+      }
+      spCursor = Math.min(len, spCursor + txt.length);
+      syncSlots(); syncCapture();
+    };
+    // 其他方式改变 value（如输入法、拖拽）时，按缓冲重建
+    si.oninput = () => { syncSlots(); syncCapture(); };
+  }
+  // 点击格子区域也能聚焦，鼠标用户同样方便
+  /* 点任意格子定位光标。
+     隐藏输入层设了 pointer-events:none，所以点击能真正落到格子上。 */
+  document.querySelectorAll("[data-slot]").forEach(el => {
+    el.onclick = (e) => {
+      if (spChecked) return;
+      const inp = $("#spInput");
+      if (!inp || inp.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const n = parseInt(el.getAttribute("data-slot"));
+      if (isNaN(n)) return;
+      setSpCursor(n);
+      inp.focus({ preventScroll: true });
+      syncCapture();
+    };
+  });
+  // 点格子之间的空隙也要能聚焦输入
+  const sw = $("#slotsWrap");
+  if (sw) {
+    sw.onclick = (e) => {
+      if (spChecked) return;
+      const inp = $("#spInput");
+      if (!inp || inp.disabled) return;
+      const slot = e.target && e.target.closest && e.target.closest("[data-slot]");
+      if (slot) {
+        const n = parseInt(slot.getAttribute("data-slot"));
+        if (!isNaN(n)) { e.preventDefault(); setSpCursor(n); }
+      }
+      inp.focus({ preventScroll: true });
+      syncCapture();
+    };
+  }
+  // 听写模式：例句里的下划线就是输入区，点哪条填哪条
+  const mk = $("#spMask");
+  if (mk) {
+    mk.onclick = (e) => {
+      if (spChecked) return;
+      const inp = $("#spInput");
+      if (!inp || inp.disabled) return;
+      const t = e.target;
+      const slot = t && t.closest && t.closest("[data-slot]");
+      if (slot) {
+        const n = parseInt(slot.getAttribute("data-slot"));
+        if (!isNaN(n)) { e.preventDefault(); setSpCursor(n); }
+      }
+      inp.focus({ preventScroll: true });
+      syncCapture();
+    };
+  }
+  function safe2(fn, label) {
+    try { fn(); }
+    catch (e) {
+      console.error(label + " 出错", e);
+      alert("「" + label + "」执行出错：" + (e && e.message || e));
+    }
+  }
+  safe("#spCheck", spCheck, "检查");
+  safe("#spReveal", spRevealOne, "提示一个字母");
+  safe("#spGive", spGiveUp, "直接看答案");
+  safe("#spNext", spNext, "下一题");
+  safe("#spRetry", spRetryCheck, "我拼好了");
+  safe("#spAgain", () => { spQueue = []; spListDone = false; render(); }, "再来一轮");
+  safe("#spSwitch", () => { spQueue = []; spListDone = false; view = "spell"; render(); }, "换个模式");
+  safe("#spTakeAdvice", () => {
+    const rec = recommendMode(spMode);
+    if (!rec) return;
+    spMode = rec.to; spQueue = []; spListDone = false; spReview = false;
+    if (view !== "spell") view = "spell";
+    render();
+  }, "切换难度");
+
+  // 进拼写页/切到下一题时自动聚焦输入框，省掉一次鼠标点击
+  if (view === "spell" && spWord && !spChecked && spInputFocusWanted !== false) {
+    const inp = $("#spInput");
+    if (inp) { try { inp.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  spInputFocusWanted = true;
+
+  /* 全局快捷键：拼写页用空格/回车进下一题，测验页用空格/回车进下一题，
+     数字键 1-4 直接选选项 —— 全程不用碰鼠标 */
+  document.onkeydown = (e) => {
+    if (e.key === "F5" || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = (e.target && e.target.tagName || "").toLowerCase();
+    const inInput = tag === "input" || tag === "textarea";
+
+    if (view === "spell" && !spListDone && spWord) {
+      // 已判定：空格 / 回车 → 下一题
+      if ((e.key === " " || e.key === "Spacebar" || e.key === "Enter")
+          && !inInput && spChecked) {
+        e.preventDefault(); safe2(spNext, "下一题"); return;
+      }
+      if (inInput && e.key === " " && spChecked) {
+        e.preventDefault(); safe2(spNext, "下一题"); return;
+      }
+    }
+    if (view === "quiz" && qiList.length) {
+      // 已作答：空格 / 回车 → 下一题
+      if ((e.key === " " || e.key === "Spacebar" || e.key === "Enter")
+          && answeredIdx === qi) {
+        e.preventDefault(); safe2(quizNext, "下一题"); return;
+      }
+      // 未作答：数字键 1-4 直接选
+      if (!inInput && /^[1-4]$/.test(e.key)) {
+        const opts = document.querySelectorAll("[data-quizopt]");
+        const opt = opts[parseInt(e.key) - 1];
+        if (opt) { e.preventDefault(); opt.onclick(); }
+      }
+    }
+  };
+
+  /* 测验 */
+  document.querySelectorAll("[data-quizopt]").forEach(el => {
+    el.onclick = (ev) => {
+      try { if (ev && ev.preventDefault) ev.preventDefault(); pickOption(el.dataset.quizopt); }
+      catch (e) {
+        console.error("选项点击出错", e);
+        alert("选项点击出错：" + (e && e.message || e));
+      }
+    };
+  });
+  safe("#nextQ", quizNext, "下一题");
+}
+
+/* ---------- 光标与输入缓冲区 ----------
+   关键设计：隐藏 input 里存的是【定长缓冲】，每个格子占一个字符位，
+   未填的位置用下划线占位。这样光标可以停在任意位置，
+   从中间开始打字、只改某一位、删掉某一位都能正常工作。
+
+   例：单词 bad，点第 2 格后打 "x" → 缓冲 "_x_" → 光标在第 3 位
+   真实 input 若存空串，光标会被浏览器强制钳到 0，就永远只能从头打。   */
+const BLANK = "_";
+
+/* 保证 spChars 长度恒等于单词长度，避免越界读写 */
+function spCharsFit() {
+  const len = spWord ? spWord.w.length : 0;
+  while (spChars.length < len) spChars.push("");
+  if (spChars.length > len) spChars.length = len;
+  return spChars;
+}
+
+/* 从隐藏 input 的 value 反推出已填字母数组（过滤掉占位下划线） */
+function readCapture(raw) {
+  const len = spWord ? spWord.w.length : 0;
+  const chars = [];
+  const s = String(raw || "").toLowerCase();
+  for (let i = 0; i < Math.max(len, s.length); i++) {
+    const c = s[i];
+    chars.push(c && c !== BLANK && /[a-z]/.test(c) ? c : "");
+  }
+  return chars;
+}
+
+/* 生成隐藏 input 的 value：已填字母 + 下划线占位，总长恒等于单词长度 */
+function buildCapture() {
+  const len = spWord ? spWord.w.length : 0;
+  let out = "";
+  for (let i = 0; i < len; i++) out += spChars[i] || BLANK;
+  return out;
+}
+
+/* 把光标移到第 n 格。后面已填的字母保留，允许从中间继续填。 */
+function setSpCursor(n) {
+  const len = spWord ? spWord.w.length : 0;
+  spCursor = Math.max(0, Math.min(n, len));
+  syncSlots();
+}
+
+/* 同步到隐藏 input，并把光标放到 spCursor 处 */
+function syncCapture() {
+  const inp = $("#spInput");
+  if (!inp) return;
+  const v = buildCapture();
+  if (inp.value !== v) inp.value = v;
+  if (inp.setSelectionRange) {
+    try { inp.setSelectionRange(spCursor, spCursor); } catch (e) {}
+  }
+}
+
+/* 打字时只刷新字母格和例句下划线，不整页重绘 —— 保证输入框不闪、光标不丢 */
+function syncSlots() {
+  /* spInput 供判定/显示使用。
+     ★ 必须用空格占位而不是空串：Array.join 会跳过空元素，
+       ["z","","x"].join("") 得到 "zx"，位置信息全丢。 */
+  spInput = spCharsFit().map(c => c || " ").join("");
+  // 去掉尾部/首部的空格只用于"是否全部为空"的判断，不影响按位取字符
+  const box = $(".slots");
+  if (box) box.innerHTML = spWordCells();
+  // 例句里的下划线跟着一起变（听写模式下它就是输入区，必须实时刷新）
+  if (spWord && spMode !== "letter") {
+    const mk2 = $("#spMask");
+    if (mk2) mk2.innerHTML = maskSentence(spWord.s, spWord.w);
+  }
+  const tip = $("#spLiveTip");
+  if (tip && spWord) {
+    const n = spWord.w.length;
+    const got = spCharsFit().filter(c => c).length;
+    tip.textContent = spRetry
+      ? `照着答案拼一遍　（${got} / ${n}）`
+      : (got === 0 ? `点任意格子定位，直接拼出 ${n} 个字母` : `已填 ${got} / ${n} 个格子`);
+  }
+}
+
+/* cardWord：从「今日词单」点某个词进来时，单词卡直接翻到它；翻页后失效。 */
+var cardWord = "";
+function currentWordIndex() {
+  if (cardWord) {
+    const i = WORDS.findIndex(w => w.w === cardWord);
+    if (i >= 0) return i;
+  }
+  const un = WORDS.map((w, i) => i).filter(i => !S.learned.includes(WORDS[i].w));
+  const list = un.length ? un : WORDS.map((w, i) => i);
+  return list[Math.floor(Math.random() * list.length)];
+}
+function nextCard() { cardWord = ""; flip = false; render(); }
+function prevCard() { cardWord = ""; flip = false; render(); }
+
+/* ---------- 首页 ---------- */
+function viewHome() {
+  // 首页 = 导航页：用大卡片进入各个功能，每个选项都是独立的一页
+  const wrongCount = openWrongWords().length;
+  const MINF = dayMasteredInfo();
+  const st = stageInfo();
+  const tp = Curriculum.today(masteredCount(), grammarDoneFn());
+  const back = (S.learned || []).length > 0;
+  // Hero 也随进度变化，而不是一尘不变的欢迎语
+  const heroTitle = back ? `欢迎回来，第 ${Math.max(1, S.days.length)} 天 👋` : "你好，欢迎开始学英语 👋";
+  // Hero 副标题：老用户给「阶段建议 + 错题数」，新用户和老用户都附一句「今日谚语」
+  const heroSub = (back
+    ? `${st.icon} 你在「${st.name}」：${st.tip}` +
+      (wrongCount ? ` 今天有 <b>${wrongCount}</b> 个错题等着订正。` : " 错题本是空的，保持住！")
+    : "先选一个模块开始，每天 15 分钟，慢慢来 —— 看不懂不要紧，照着念就有语感。")
+    + proverbHtml();
+  const cards = [
+    // 「每日复习」原本只靠顶部切换条进入；切换条移除后必须在这里留一个入口，否则该页会成为孤儿。
+    { v: "review",  c: "review",  icon: "🔁", t: "每日复习", d: wrongCount ? `你有 ${wrongCount} 个错词等着复习，先复习再学新词。` : "先复习旧词再学新词；现在错题本是空的，可以先去学新词。" },
+    { v: "spell",   c: "spell",   icon: "⌨️", t: "拼写练习", d: "看中文，把英文一个字母一个字母敲出来。最核心的一步。" },
+    { v: "cards",   c: "cards",   icon: "🃏", t: "单词卡",   d: "看中文、例句，点开看词性、单复数和词源详解。" },
+    { v: "wrong",   c: "wrong",   icon: "📕", t: "错题本",   d: wrongCount ? `你有 ${wrongCount} 个还没订正的错词，点进来逐个攻克。` : "拼错/答错的词会收在这里，逐条订正才算掌握。" },
+    { v: "etymon",  c: "etymon",  icon: "📖", t: "词源词典", d: WORDS.filter(w => w.root).length + " 个词的故事，知道为什么是这个意思，才忘不掉。" },
+    { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
+    { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
+    { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
+    { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "10 道中→英选择题，检验今天的学习成果。" },
+    { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" }
+  ];
+  return `
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-spark s1"></div>
+    <div class="hero-spark s2"></div>
+    <div class="hero-inner">
+      <span class="hero-pill">${st.icon} ${st.name}${S.days.length ? ` · 第 ${S.days.length} 天` : " · 零基础友好"}</span>
+      <span class="hero-goal">🎯 本阶段目标：${tp.goal}　<span class="muted">（学到这一步，你就能${tp.goal.replace(/^能/, "")}）</span></span>
+      <h1>${heroTitle}</h1>
+      <p>${heroSub}</p>
+    </div>
+    <button class="hero-mascot${mascotTap ? " tapped" : ""}" data-mascot="1"
+            aria-label="点一下吉祥物" title="点我聊两句">
+      <span class="mc">🦉</span>
+      ${mascotMsg ? `<span class="mc-bubble" role="status"><b>${mascotFace}</b>${mascotMsg}</span>` : ""}
+    </button>
+  </section>
+
+  <section class="home-stats">
+    <button class="hs hs-today" data-v="today">
+      <span class="hs-ico">📅</span>
+      <span class="hs-text"><span class="big">${S.todayWords.length}<span class="unit">/${dailyGoal}</span></span><span class="muted">今日已学单词 ›</span></span>
+    </button>
+    <button class="hs hs-mastered" data-v="today">
+      <span class="hs-ico">🎯</span>
+      <span class="hs-text"><span class="big">${MINF.done}<span class="unit">/${MINF.total}</span></span><span class="muted">今日熟练掌握 ›</span></span>
+    </button>
+    <div class="hs hs-learned"><span class="hs-ico">📚</span><span class="hs-text"><span class="big">${S.learned.length}</span><span class="muted">累计掌握</span></span></div>
+    <div class="hs hs-days"><span class="hs-ico">🔥</span><span class="hs-text"><span class="big">${streakDays()}</span><span class="muted">连续打卡(天)</span></span></div>
+    <div class="hs hs-stars"><span class="hs-ico">⭐</span><span class="hs-text"><span class="big">${S.stars}</span><span class="muted">收集星星</span></span></div>
+    <button class="hs hs-wrong${wrongCount ? "" : " is-empty"}" data-v="wrong">
+      <span class="hs-ico">${wrongCount ? "📕" : "✅"}</span>
+      <span class="hs-text"><span class="big">${wrongCount}</span><span class="muted">${wrongCount ? "错题待订正 ›" : "错题已清空 ›"}</span></span>
+    </button>
+  </section>
+
+  <h2>选择一个模块开始</h2>
+  <div class="nav-grid">
+    ${cards.map(c => `
+      <button class="nav-card nc-${c.c}" data-v="${c.v}">
+        <span class="nc-chip">${c.icon}</span>
+        <span class="nc-title">${c.t}</span>
+        <span class="nc-desc">${c.d}</span>
+        <span class="nc-go">进入 →</span>
+      </button>`).join("")}
+  </div>
+
+  ${todayPlan()}`;
+}
+
+/* ---------- 今日计划（自适应） ----------
+   文案不是写死的，而是根据你当前的：错题数 / 今日已学 / 各模式正确率 / 学习阶段
+   实时生成。所以每天打开看到的内容都不一样。 */
+function todayPlan() {
+  const st = stageInfo();
+  const wrongCount = openWrongWords().length;
+  const todayN = (S.todayWords || []).length;
+  const mi = dayMasteredInfo();
+  const rec = recommendMode("cn") || recommendMode(spMode);
+  const tp = todayPlan_raw();
+  const gdone = grammarDoneFn();
+  const items = [];
+
+  if (wrongCount > 0) {
+    items.push({ p: "high", icon: "📕", t: `先订正 ${wrongCount} 个错题`,
+      d: "这些是你拼错 / 答错过的词。每个词都能就地重拼，拼对后自动移出。",
+      v: "wrong", btn: "去订正 →" });
+  }
+  if (todayN === 0) {
+    items.push({ p: "high", icon: "⌨️", t: "今天还没开始拼写",
+      d: `今天练 ${dailyGoal} 个词。出题会优先给你"该练的"：错题 → 待巩固 → 新词。`,
+      v: "spell", btn: "开始拼写 →" });
+  } else if (todayN < dailyGoal) {
+    items.push({ p: "mid", icon: "⌨️", t: `今天已练 ${todayN} / ${dailyGoal} 个词`,
+      d: `再练 ${dailyGoal - todayN} 个就完成今天的量了（注意：「练过」不等于「掌握」，掌握要连对 3 次）。`,
+      v: "spell", btn: "继续拼写 →" });
+  } else {
+    items.push({ p: "done", icon: "✅", t: `今天的拼写量已完成（${todayN} 个）`,
+      d: `其中 <b>${mi.done}</b> / ${mi.total} 个已达到「熟练掌握」（连对 3 次），剩下的再巩固几遍。`,
+      v: "quiz", btn: "去做测验 →" });
+  }
+  if (rec) {
+    items.push({ p: "mid", icon: "🎚", t: `难度建议：试试「${modeName(rec.to)}」`,
+      d: rec.why, v: "spell", btn: "去练 →" });
+  }
+  // —— 学习方案引擎安排的"今天的课"（用户只看到今天，看不到整条路线）——
+  const gIdx = (tp.grammar || []).filter(g => !gdone(g))[0];
+  if (gIdx != null && typeof GRAMMAR !== "undefined" && GRAMMAR[gIdx]) {
+    items.push({ p: "mid", icon: "📚", t: `今天的语法课：${String(GRAMMAR[gIdx].t || "").replace(/^第\d+课：/, "")}`,
+      d: "这一课正好配你现在学的词，上完再做里面那 5 道小测验。",
+      v: "grammar", lesson: gIdx, btn: "去上课 →" });
+  }
+  if (tp.phrases && tp.phrases.length) {
+    items.push({ p: "low", icon: "💬", t: `今天练 ${tp.phrases.length} 句口语`,
+      d: "这几句配你现在的阶段正合适：先跟读两遍，再自己说一遍。",
+      v: "phrases", btn: "去练口语 →" });
+  }
+  const weakN = WORDS.filter(w => { const m = mastery(w.w); return m >= 1 && m <= 4; }).length;
+  const freshN = WORDS.filter(w => mastery(w.w) === 0).length;
+  items.push({ p: "low", icon: st.icon, t: `你正处在「${st.name}」`,
+    d: `${st.tip} 目前：已掌握 ${masteredCount()} 个、待巩固 ${weakN} 个、未学过 ${freshN} 个。`,
+    v: "me", btn: "看进度 →" });
+
+  // 词都学完了就换个重点，别再让「练新词」占着位置 —— 内容要跟着进度走
+  if (freshN === 0 && wrongCount === 0) {
+    items.push({ p: "mid", icon: "🎧", t: "词都过了一遍了，今天练「听写」",
+      d: "没有新词也没错题时，最值钱的是听写：只听发音就把词写出来，才叫真记住。",
+      v: "spell", btn: "去听写 →" });
+  }
+
+  // 今天真正要练的几个词：由掌握度 + 日期算出来，不是写死的清单
+  const focus = mi.list;
+  const remaining = toNextStage();
+  return `<div class="card home-plan">
+    <h3>🎯 今日计划 <span class="plan-stage">${st.icon} ${st.name}</span></h3>
+    <p class="muted">下面每一条都是<b>根据你的学习记录自动生成的</b>，会随你的练习情况而变化。</p>
+    <div class="plan-goal">🏁 本阶段目标：<b>${tp.goal}</b>　·　${remaining > 0 ? `再掌握 <b>${remaining}</b> 个词进入下一阶段`
+      : remaining === 0 ? "词数已经够了，做完本课测验就能进入下一阶段"
+      : "已是最后阶段，把学过的词和句型自由组合着说"}</div>
+    <div class="today-words">
+      <div class="tw-head">今日达标清单 <span class="muted">（今天就盯这几个词，达标一个打一个勾；点一下看详解）</span></div>
+      <div class="tw-list">
+        ${focus.map(w => {
+          const mp = masteryProgress(w.w);
+          const badge = mp.ok
+            ? `<span class="tw-ok">✓ 已掌握</span>`
+            : `<span class="tw-need">连对 ${mp.streak}/${mp.need}</span>`;
+          return `
+          <button class="tw${mp.ok ? " done" : ""}" data-word="${w.w}">
+            <b>${w.w}</b><span class="tw-cn">${(w.cn || "").slice(0, 12)}</span>${badge}
+          </button>`;
+        }).join("")}
+      </div>
+      ${mi.all ? `<div class="tw-all">🎉 这一组已经全部熟练掌握（${mi.done}/${mi.total}）。<button class="btn tw-more" data-act="morewords">再来一组 →</button></div>` : ""}
+    </div>
+    <div class="mastery-rule">
+      <b>怎样才算「熟练掌握」？</b>
+      <span>今天练过　·　<b>连续拼对 3 次</b>　·　全程没点提示 / 没看答案　·　不在错题本里。</span>
+      <span class="muted">只看「练过几个」不算数 —— 抄一遍答案也能凑数，这里卡的是连对次数；中途点了提示或拼错一次就清零重来。</span>
+      <span class="mr-now">今天已熟练掌握 <b>${mi.done}</b> / ${mi.total} 个</span>
+    </div>
+    <div class="plan-list">
+      ${items.map(it => `
+        <div class="plan-item ${it.p}">
+          <span class="pi-ico">${it.icon}</span>
+          <div class="pi-body"><b>${it.t}</b><p class="muted">${it.d}</p></div>
+          <button class="btn pi-go" data-v="${it.v}"${it.lesson != null ? ` data-lesson="${it.lesson}"` : ""}>${it.btn}</button>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ---------- 今日已学单词 ---------- */
+/* 今天该练哪几句口语（进度驱动）：本阶段安排的句子里还没会的；
+   都学会了就往后补几句还没会的。口语页和今日任务页共用同一套算法。 */
+function todayPhrases() {
+  const tp = todayPlan_raw();
+  const doneSet = new Set(S.phraseDone || []);
+  let list = (tp.phrases || []).filter(i => !doneSet.has(i));
+  if (!list.length) list = PHRASES.map((_, i) => i).filter(i => !doneSet.has(i)).slice(0, 3);
+  return list;
+}
+
+/* ---------- 今日任务清单 ----------
+   顶部「今日 x/y」点进来看到的就是这一页：今天该学哪些词、哪几句口语、
+   哪一节语法课，每一样都标出「已经搞定 / 还没学」，没学的直接给入口。 */
+function viewToday() {
+  const mi = dayMasteredInfo();
+  const tp = todayPlan_raw();
+  const gdone = grammarDoneFn();
+  const gList = (tp.grammar || []);
+  const gTodo = gList.filter(g => !gdone(g))[0];
+  const phTodo = todayPhrases();
+  const phDoneN = phTodo.filter(i => phraseDone(i)).length;
+  const todayN = (S.todayWords || []).length;
+  const wordAll = mi.all;
+  const phAll = phTodo.length > 0 && phDoneN === phTodo.length;
+
+  // ① 总览：一眼看清今天还剩什么
+  const over = `
+    <div class="card today-overview">
+      <h3>📋 今天要做到的事 <span class="muted">（全打勾 = 今天达标）</span></h3>
+      <div class="to-grid">
+        <div class="to-item${wordAll ? " ok" : ""}">
+          <span class="to-ico">📝</span>
+          <div class="to-main"><b>单词</b><span class="to-sub">${mi.done} / ${mi.total} 已熟练掌握</span></div>
+          <span class="to-tag">${wordAll ? "✅ 完成" : `还差 ${mi.total - mi.done} 个`}</span>
+        </div>
+        <div class="to-item${phAll ? " ok" : ""}">
+          <span class="to-ico">💬</span>
+          <div class="to-main"><b>口语句子</b><span class="to-sub">${phDoneN} / ${phTodo.length || 0} 已会</span></div>
+          <span class="to-tag">${phTodo.length === 0 ? "✅ 全部会了" : (phAll ? "✅ 完成" : `还差 ${phTodo.length - phDoneN} 句`)}</span>
+        </div>
+        <div class="to-item${gTodo == null ? " ok" : ""}">
+          <span class="to-ico">📚</span>
+          <div class="to-main"><b>语法课</b><span class="to-sub">${gTodo == null ? "今天的课已上完" : `今天这节还没上`}</span></div>
+          <span class="to-tag">${gTodo == null ? "✅ 完成" : "待上"}</span>
+        </div>
+        <div class="to-item${todayN >= dailyGoal ? " ok" : ""}">
+          <span class="to-ico">⌨️</span>
+          <div class="to-main"><b>拼写量</b><span class="to-sub">${todayN} / ${dailyGoal} 个词</span></div>
+          <span class="to-tag">${todayN >= dailyGoal ? "✅ 完成" : `还差 ${Math.max(0, dailyGoal - todayN)} 个`}</span>
+        </div>
+      </div>
+    </div>`;
+
+  // ② 今日单词：达标清单，逐词标出「已掌握 / 连对几次 / 还没练」
+  const wordBlock = `
+    <div class="card">
+      <h3>📝 今日单词 <span class="muted">（${mi.done}/${mi.total} 已掌握 · 连对 3 次算掌握）</span></h3>
+      <div class="td-list">
+        ${mi.list.map(w => {
+          const mp = masteryProgress(w.w);
+          return `<div class="td-row${mp.ok ? " done" : ""}">
+            <span class="td-ico">${mp.ok ? "✅" : "⬜"}</span>
+            <div class="td-main"><b>${w.w}</b><span class="td-cn">${(w.cn || "").slice(0, 12)}</span></div>
+            <span class="td-st ${mp.ok ? "ok" : "need"}">${mp.ok ? "已掌握" : (mp.seen ? `连对 ${mp.streak}/3` : "还没练")}</span>
+            <button class="mini" data-word="${w.w}">看详解</button>
+          </div>`;
+        }).join("")}
+      </div>
+      <button class="btn td-go" data-v="spell">去拼写练习 →</button>
+      ${mi.all ? `<div class="tw-all">🎉 这一组全部熟练掌握（${mi.done}/${mi.total}）。<button class="btn tw-more" data-act="morewords">再来一组 →</button></div>` : ""}
+    </div>`;
+
+  // ③ 今日口语：今天该练的几句，点了「我会了」就打勾
+  const phBlock = phTodo.length ? `
+    <div class="card">
+      <h3>💬 今日口语 <span class="muted">（${phDoneN}/${phTodo.length} 已会 · 跟着 🔊 大声读三遍）</span></h3>
+      <div class="td-list">
+        ${phTodo.map(i => {
+          const p = PHRASES[i];
+          const done = phraseDone(i);
+          return `<div class="td-row${done ? " done" : ""}">
+            <span class="td-ico">${done ? "✅" : "⬜"}</span>
+            <div class="td-main"><b>${p.en}</b><span class="td-cn">${p.cn}</span></div>
+            <span class="td-st ${done ? "ok" : "need"}">${done ? "已会" : "还没会"}</span>
+            <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊</button>
+            <button class="mini${done ? " ph-done" : ""}" data-phrase="${i}">${done ? "取消" : "我会了"}</button>
+          </div>`;
+        }).join("")}
+      </div>
+      <button class="btn td-go" data-v="phrases">去练口语 →</button>
+    </div>` : `
+    <div class="card">
+      <h3>💬 今日口语 <span class="muted">（${PHRASES.length} 句全部都会了）</span></h3>
+      <p class="muted">每一句都标记过「我会了」。想继续就点 🔊 再跟读几遍，保持语感。</p>
+      <button class="btn td-go" data-v="phrases">去复习口语 →</button>
+    </div>`;
+
+  // ④ 今日语法课
+  const gBlock = `
+    <div class="card">
+      <h3>📚 今日语法课</h3>
+      <p class="muted">${gTodo != null
+        ? `今天这节：<b>${String((GRAMMAR[gTodo] && GRAMMAR[gTodo].t) || "").replace(/^第\d+课：/, "")}</b> —— 上完再做里面那 5 道小测验，做完才算学完。`
+        : "今天安排的语法课都上完了，可以去做「✍️ 测验」检验一下。"}</p>
+      ${gTodo != null
+        ? `<button class="btn" data-goto="${gTodo}">去上这一课 →</button>`
+        : `<button class="btn td-go" data-v="quiz">去做测验 →</button>`}
+    </div>`;
+
+  // ⑤ 今天学会的词（详细讲解）
+  const list = (S.todayWords || []).map(findWord).filter(Boolean);
+  const detail = list.length ? `
+    <h2>📖 今天学会的词 <span class="muted">（${list.length} 个 · 含词性与单复数）</span></h2>
+    <div class="today-list">
+      ${list.map(w => todayWordCard(w)).join("")}
+    </div>` :
+    `<h2>📖 今天学会的词</h2>
+    <div class="card">
+      <h3>今天还没记录到具体单词</h3>
+      <p class="muted">你今天学的词会从现在开始累计到这里。去「⌨️ 拼写练习」或「🃏 单词卡」学几个词，回来就能看到清单。</p>
+      <p class="muted">更早之前学会的词在「📈 我的 → 已学会的词」里查看。</p>
+    </div>`;
+
+  // 页面头由 render() 统一插入，这里只返回正文（早期这里重复插了一次，导致标题出现两遍）
+  return over + wordBlock + phBlock + gBlock + detail;
+}
+
+/* 单个「今日单词」卡片：词 + 中文 + 词性/其他用法/复数/可数性 + 例句 */
+function todayWordCard(w) {
+  return `<div class="card tw-card">
+    <div class="tw-top">
+      <div class="tw-badge">${(w.w[0] || "?").toUpperCase()}</div>
+      <div class="tw-word">${w.w}</div>
+      <div class="tw-cn">${w.cn || ""}</div>
+    </div>
+    ${w.pos ? `
+    <div class="wc-grammar">
+      <div class="wc-row"><span class="wc-k">词性</span><span class="wc-v">${w.pos}</span></div>
+      ${w.senses ? `<div class="wc-row"><span class="wc-k">其他用法</span><span class="wc-v">${w.senses}</span></div>` : ""}
+      ${w.plural ? `<div class="wc-row"><span class="wc-k">复数</span><span class="wc-v">${w.plural}</span></div>` : ""}
+      ${w.countNote ? `<div class="wc-row"><span class="wc-k">可数性</span><span class="wc-v">${w.countNote}</span></div>` : ""}
+    </div>` : ""}
+    ${w.s ? `<div class="tw-ex">
+      <div class="wc-ex-en">${highlightWord(w.s, w.w)}</div>
+      <div class="wc-ex-cn">${w.sentCn || ""}</div>
+    </div>` : ""}
+  </div>`;
+}
+
+/* ---------- 错题本 ----------
+   列出所有拼错/答错过的词。分成两组：
+     · 还没订正（fixed 为空）—— 这就是"自己还没搞懂的"，排在最上面
+     · 已订正 —— 后来拼对过的，留作记录
+   每个词都带词性/单复数，方便对照着记。 */
+function viewWrong() {
+  const all = (S.wrongWords || []).slice().reverse();   // 最近错的排前面
+  const open  = all.filter(w => !(wrongStat(w).fixed));
+  const fixed = all.filter(w => wrongStat(w).fixed);
+  const openList  = open.map(findWord).filter(Boolean);
+  const fixedList = fixed.map(findWord).filter(Boolean);
+
+  if (!all.length) {
+    return `
+    <div class="card wrong-empty">
+      <div class="we-ico">🎉</div>
+      <h3>错题本是空的</h3>
+      <p class="muted">你还没有拼错或答错过任何单词。继续保持！</p>
+      <p class="muted">以后在「⌨️ 拼写练习」拼错、或在「✍️ 测验」答错的词，都会自动收进这里，方便你针对性复习。</p>
+    </div>`;
+  }
+
+  const head = `
+    <div class="wrong-sum">
+      <div class="ws-item ws-open"><span class="ws-n">${openList.length}</span><span class="ws-l">还没搞懂</span></div>
+      <div class="ws-item ws-fixed"><span class="ws-n">${fixedList.length}</span><span class="ws-l">已订正</span></div>
+      <div class="ws-item ws-total"><span class="ws-n">${openList.length + fixedList.length}</span><span class="ws-l">累计错词</span></div>
+    </div>
+    <p class="muted">这些是你拼错或答错过的词。<b>每个词下面都有「⌨️ 再拼一遍这个词」，点一下就能就地重拼，拼对后自动标为「已订正」。</b></p>
+    ${openList.length ? `<button class="btn primary" id="practiceWrong">⌨️ 一次练完这些错词（${openList.length} 个）</button>` : ""}`;
+
+  const openSection = openList.length ? `
+    <h2>📕 还没搞懂的（${openList.length}）</h2>
+    <div class="today-list">${openList.map(w => wrongWordCard(w, false)).join("")}</div>` : "";
+
+  const fixedSection = fixedList.length ? `
+    <h2>✅ 已订正的（${fixedList.length}）</h2>
+    <p class="muted">这些词你后来已经重新拼对过了，恭喜！留在这里供你回顾。</p>
+    <div class="today-list">${fixedList.map(w => wrongWordCard(w, true)).join("")}</div>` : "";
+
+  return head + openSection + fixedSection + `
+    <div class="card">
+      <button class="btn danger" id="clearWrong">🗑 清空错题本</button>
+    </div>`;
+}
+
+/* 单个错词卡片：词 + 中文 + 错误次数/最后错误日期 + 词性/单复数 + 例句 */
+function wrongWordCard(w, isFixed) {
+  const st = wrongStat(w.w);
+  const meta = [];
+  if (st.n > 1) meta.push(`错了 ${st.n} 次`);
+  if (st.last)  meta.push(`最后错于 ${st.last}`);
+  if (isFixed && st.fixed) meta.push(`✅ ${st.fixed} 订正`);
+  return `<div class="card tw-card wr-card ${isFixed ? "wr-fixed" : "wr-open"}">
+    <div class="tw-top">
+      <div class="tw-badge ${isFixed ? "wr-badge-fixed" : ""}">${(w.w[0] || "?").toUpperCase()}</div>
+      <div class="tw-word">${w.w}</div>
+      <div class="tw-cn">${w.cn || ""}</div>
+    </div>
+    ${meta.length ? `<div class="wr-meta">${meta.map(m => `<span class="wr-tag">${m}</span>`).join("")}</div>` : ""}
+    ${w.pos ? `
+    <div class="wc-grammar">
+      <div class="wc-row"><span class="wc-k">词性</span><span class="wc-v">${w.pos}</span></div>
+      ${w.senses ? `<div class="wc-row"><span class="wc-k">其他用法</span><span class="wc-v">${w.senses}</span></div>` : ""}
+      ${w.plural ? `<div class="wc-row"><span class="wc-k">复数</span><span class="wc-v">${w.plural}</span></div>` : ""}
+      ${w.countNote ? `<div class="wc-row"><span class="wc-k">可数性</span><span class="wc-v">${w.countNote}</span></div>` : ""}
+    </div>` : ""}
+    ${w.s ? `<div class="tw-ex">
+      <div class="wc-ex-en">${highlightWord(w.s, w.w)}</div>
+      <div class="wc-ex-cn">${w.sentCn || ""}</div>
+    </div>` : ""}
+    <!-- 就地重拼：不用跳去拼写练习、再自己把词找出来 -->
+    <div class="wr-act">
+      <button class="btn primary wr-practice" data-practice="${w.w}">⌨️ 再拼一遍这个词</button>
+      <span class="muted wr-hint">拼对后自动标为「已订正」</span>
+    </div>
+  </div>`;
+}
+
+/* ---------- 每日复习 ----------
+   复习【只出错题】：只从错题本里取词，绝不混入没学过的新词。
+   顺序：先「还没订正的」→ 再「已订正的」（已订正也是错题，复习一下更牢）。
+   错题本为空时返回空数组，页面会提示"今天没有要复习的错题"。 */
+const REVIEW_SIZE = 8;
+function reviewQueue() {
+  const open = shuffle(openWrongWords().map(findWord).filter(Boolean));
+  const openSet = new Set(open.map(w => w.w));
+  const fixed = shuffle((S.wrongWords || [])
+    .map(findWord).filter(Boolean).filter(w => !openSet.has(w.w)));
+  return open.concat(fixed).slice(0, REVIEW_SIZE);
+}
+function startReview() {
+  const q = reviewQueue();
+  if (!q.length) return;                    // 没有错题就不开复习
+  spQueue = q;
+  spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false;
+  spMode = "cn"; spReview = true; spLoad();
+  view = "spell"; render();
+}
+/* 错题本里点某个词的「再拼一遍」：只练这一个词，拼对后自动订正 */
+function practiceOneWord(word) {
+  const w = findWord(word);
+  if (!w) { goView("wrong"); return; }
+  spQueue = [w];
+  spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false;
+  spMode = "cn"; spReview = false; spLoad();
+  view = "spell"; render();
+}
+function viewReview() {
+  const openN = openWrongWords().length;
+  const totalN = (S.wrongWords || []).length;
+  const q = reviewQueue();
+  const done = S.lastReview === today();
+
+  if (!q.length) {
+    return `
+    <div class="card wrong-empty">
+      <div class="we-ico">🎉</div>
+      <h3>今天没有需要复习的错题</h3>
+      <p class="muted">复习<b>只出错题</b>——你拼错或答错过的词。现在错题本是空的，说明之前的错词都订正过了，很棒！</p>
+      <p class="muted">去「⌨️ 拼写练习」学几个新词吧。以后有了错词，第二天这里会自动帮你复习。</p>
+      <div class="rev-actions">
+        <button class="btn primary" data-v="spell" id="revGoSpell">⌨️ 去拼写练习学新词</button>
+        <button class="btn" data-back="home" id="revGoHome">返回首页</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="card rev-card">
+    <div class="rev-hero">
+      <span class="rev-emoji">🔁</span>
+      <div>
+        <h3>${done ? "今天的复习已完成 ✅" : "今天的复习还没做"}</h3>
+        <p class="muted">每天第一次来，先把<b>错题</b>重新默写一遍。记忆靠的是"隔天再想起来"，不是一次性背很多遍。</p>
+      </div>
+    </div>
+    <div class="rev-grid">
+      <div class="rev-cell"><b>${q.length}</b><span>本轮复习词数</span></div>
+      <div class="rev-cell"><b>${openN}</b><span>错题待订正</span></div>
+      <div class="rev-cell"><b>${totalN}</b><span>错题本累计</span></div>
+    </div>
+    <p class="muted">复习<b>只出错题</b>：先安排你还没订正的，再复习已经订正过的。<b>不会出现没学过的新词。</b>拼对错题本里的词，会自动标记「已订正」。</p>
+    <div class="rev-actions">
+      <button class="btn primary" id="startReview">▶ 开始复习（${q.length} 个词）</button>
+      <button class="btn" id="skipReview">今天先跳过</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>为什么每天先复习？</h3>
+    <ul class="tips">
+      <li><b>复习比学新词更重要。</b>昨天拼错的词，今天还能默写出来，才算真的记住。</li>
+      <li>复习<b>只出错题</b>，那些"似会非会"的词正是最容易忘的；绝不会混进没学过的新词来干扰你。</li>
+      <li>复习最多 ${REVIEW_SIZE} 个词，两三分钟，不占时间，但效果最大。</li>
+    </ul>
+  </div>`;
+}
+
+/* ---------- 单词卡 ---------- */
+function viewCards() {
+  curCard = WORDS[currentWordIndex()];
+  const w = curCard;
+  return `
+  <h2>单词卡 · 共 ${WORDS.length} 个</h2>
+  <p class="muted">意思、例句、句意、词源全部直接显示，不用点任何按钮。</p>
+
+  <!-- 单词主体 + 词性 + 意思 + 单复数 + 例句，全在同一个块里 -->
+  <div class="card wordcard">
+    <div class="wc-top">
+      <div class="wc-word">${w.w}</div>
+      ${(w._today && w._today === window.TODAY_STR) ? '<span class="today-badge">🌐 今日新词</span>' : ""}
+      <div class="wc-side">
+        <div class="wc-ph">${w.ph}</div>
+        <div class="wc-cn">${w.cn}</div>
+      </div>
+    </div>
+
+    ${w.pos ? `
+    <div class="wc-grammar">
+      <div class="wc-row">
+        <span class="wc-k">词性</span>
+        <span class="wc-v">${w.pos}</span>
+      </div>
+      ${w.senses ? `
+      <div class="wc-row">
+        <span class="wc-k">其他用法</span>
+        <span class="wc-v">${w.senses}</span>
+      </div>` : ""}
+      ${w.plural ? `
+      <div class="wc-row">
+        <span class="wc-k">复数</span>
+        <span class="wc-v">${w.plural}</span>
+      </div>` : ""}
+      ${w.countNote ? `
+      <div class="wc-row">
+        <span class="wc-k">可数性</span>
+        <span class="wc-v">${w.countNote}</span>
+      </div>` : ""}
+    </div>` : ""}
+
+    <div class="wc-ex">
+      <div class="wc-ex-en">${highlightWord(w.s, w.w)}</div>
+      <div class="wc-ex-cn">${w.sentCn || ""}</div>
+      <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 朗读例句</button>
+    </div>
+
+    ${w.sentWords && w.sentWords.length ? `
+    <div class="wc-words">
+      <span class="wc-k">逐词释义</span>
+      <div>${w.sentWords.map(([e, c]) => `<span class="witem"><b>${e}</b> ${c}</span>`).join("")}</div>
+    </div>` : ""}
+
+    ${w.tip ? `<div class="wc-tip">💡 ${w.tip}</div>` : ""}
+  </div>
+
+  <div class="ctrls">
+    <button id="prevBtn" class="btn">← 换一个</button>
+    <button id="learnBtn" class="btn primary">我学会了 +1 ⭐</button>
+    <button id="nextBtn" class="btn">换一个 →</button>
+    <button id="toSpell" class="btn">⌨️ 去拼写这个词</button>
+  </div>
+
+  <!-- 为什么是这个意思 / 为什么这么写 -->
+  ${viewWordDetail(w)}
+
+  <div class="card">
+    <h3>已学会的词（${S.learned.length}）</h3>
+    <div class="tags">${S.learned.length
+      ? S.learned.map(x => `<span class="tag">${x}</span>`).join("")
+      : `<span class="muted">还没有记录，从上面开始吧。</span>`}</div>
+  </div>`;
+}
+
+/* ---------- 拼写练习 ---------- */
+const SPELL_MODES = [
+  { id: "cn", name: "中→英", desc: "看中文意思，拼出英文单词" },
+  { id: "letter", name: "首字母", desc: "只给首字母和长度，拼出完整单词" },
+  { id: "dict", name: "听写", desc: "只看音标和例句，凭记忆拼写（最难）" }
+];
+
+function spNewRound() {
+  // 自适应出题：错题 → 待巩固 → 新词 → 已掌握（凑数），越熟的词越少出现
+  spQueue = adaptiveQueue(10);
+  spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+  spLoad();
+}
+function spLoad() {
+  spWord = spQueue[spPos];
+  spInput = ""; spChars = []; spChecked = false; spResult = null; spReveal = 0;
+  spShowAnswer = false; spRetry = false; spCursor = 0; spLastWrong = ""; spJustFixed = false;
+  spAssisted = false;
+}
+function spKey() { return "spelling_score_" + spMode; }
+function spLoadBest() {
+  try { return JSON.parse(store.get(spKey())) || { r: 0, w: 0 }; }
+  catch (e) { return { r: 0, w: 0 }; }
+}
+function spSaveBest() {
+  const b = spLoadBest();
+  if (spScore.r > b.r) store.set(spKey(), JSON.stringify(spScore));
+}
+
+/* 当前显示的答案串：已揭示的字母用真字母，其余用 _ */
+function spMask() {
+  const w = spWord.w;
+  let out = "";
+  for (let i = 0; i < w.length; i++) {
+    if (i < spReveal) out += w[i];
+    else if (spChecked && spInput[i] === w[i]) out += w[i];
+    else out += "_";
+  }
+  return out;
+}
+function spTarget() {
+  const w = spWord.w;
+  return (spInput + w.slice(spInput.length)).slice(0, w.length);
+}
+/* ---------- 拼写核心 ----------
+   1. 可点击任意格子定位光标，不必总从第 1 个开始
+   2. 打字过程中【不】上对错色，避免剧透答案
+   3. 判定后错的地方要一眼看清，整词结论明确写出
+   4. 拼错后不给「下一题」，必须重拼一遍才算过              */
+/* 单个「下划线填空格」的渲染。所有模式（中→英 / 首字母 / 听写）共用这一种样式，
+   点哪格填哪格，和听写例句里的下划线是同一套视觉。 */
+function spCell(ch, i) {
+  const typed = spChars[i] || "";
+  const interactive = !spShowAnswer && !spChecked;
+  let cls = "blanksq";
+  let txt = "";
+  if (spShowAnswer) {
+    // 已判定：一律显示正确字母，用颜色表达"这个字母你写对没"
+    txt = ch;
+    if (typed && typed !== ch) cls += " bad";
+    else if (typed === ch) cls += " ok";
+    else cls += " ans";
+  } else if (typed) {
+    cls += (i < spReveal) ? " filled shown" : " filled";
+    txt = typed;
+  } else if (i < spReveal) {
+    cls += " shown"; txt = ch;       // 提示揭示的字母
+  } else {
+    cls += " blank"; txt = "";
+  }
+  if (interactive) {
+    cls += " fillable";
+    if (i === spCursor) cls += " caret-b";   // 下一个待填位置
+  }
+  return `<span class="${cls}" data-slot="${i}">${txt === "" ? "&nbsp;" : txt}</span>`;
+}
+/* 居中、醒目的「下划线填字区」—— 所有模式的统一输入区，不再用独立方框。 */
+function spWordCells() {
+  return spWord.w.split("").map((ch, i) => spCell(ch, i)).join("");
+}
+
+/* 整词判定：每一格都必须填对，且一个不多一个不少 */
+function spIsCorrect() {
+  const w = spWord.w;
+  if (spChars.length < w.length) return false;
+  for (let i = 0; i < w.length; i++) {
+    if (spChars[i] !== w[i]) return false;
+  }
+  return true;
+}
+/* 第几个字母错了（1 起）；全对返回 0 */
+function spWrongAt() {
+  const w = spWord.w;
+  for (let i = 0; i < w.length; i++) {
+    if (spChars[i] !== w[i]) return i + 1;
+  }
+  return 0;
+}
+/* 用"你写下的字符串"比对，找出第几个字母错（1 起），全对返回 0。
+   不依赖 spChars（拼错后会被清空），所以拼写错误反馈里用它最可靠。 */
+function firstWrong(userStr, correct) {
+  for (let i = 0; i < correct.length; i++) {
+    if (userStr[i] !== correct[i]) return i + 1;
+  }
+  return 0;
+}
+/* 玩家实际填的字母串（跳过空格），用于展示"你写的：xxx" */
+function spTypedStr() {
+  return spCharsFit().filter(c => c).join("");
+}
+
+/* 把例句里的目标词挖空。
+   ★ 听写模式下这些下划线就是【输入区本身】—— 点哪条就往哪填，
+     不需要另找一个输入框。
+   ★ 判定前不显示任何未填位置的字母（否则等于剧透答案）。 */
+function maskSentence(sentence, word) {
+  const safe = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const blanks = word.split("").map((ch, i) => spCell(ch, i)).join("");
+  return sentence.replace(new RegExp("(" + safe + ")", "gi"), blanks);
+}
+
+function viewSpell() {
+  if (!spQueue.length) spNewRound();
+  if (spListDone) return spResultScreen();
+
+  const w = spWord;
+  const mode = SPELL_MODES.find(m => m.id === spMode);
+  const len = w.w.length;
+
+  // 提示区：按模式决定给多少信息
+  let prompt = "";
+  if (spMode === "cn") {
+    prompt = `<div class="sp-cn">${w.cn}</div>
+      <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>`;
+  } else if (spMode === "letter") {
+    prompt = `<div class="sp-cn">中文意思：${w.cn}</div>
+      <p class="ex">共 <b>${len}</b> 个字母，首字母是 <b class="big-first">${w.w[0]}</b></p>`;
+  } else {
+    prompt = `<div class="sp-ph">${w.ph}</div>
+      <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>
+      <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 听例句</button>`;
+  }
+  // 听写模式零基础最需要：句子的中文 + 每个词的意思
+  if (spMode === "dict") prompt += sentenceHelp(w);
+
+  let fb = "";
+  if (spRetry && !spChecked) {
+    // 拼错后：明确指出错在哪，并要求重拼（输入框已清空，从头再打）
+    const youWrote = (spLastWrong || spTypedStr()).replace(/\s+/g, "");
+    let where;
+    if (youWrote.length !== len) {
+      where = `你写了 <b>${youWrote.length}</b> 个字母，这个词有 <b>${len}</b> 个`;
+    } else {
+      const at = firstWrong(youWrote, w.w);
+      if (at > 0) {
+        where = `第 <b>${at}</b> 个字母不对（你写的是 <b>${youWrote[at - 1]}</b>，应该是 <b>${w.w[at - 1]}</b>）`;
+      } else {
+        where = "有字母顺序不对";
+      }
+    }
+    fb = `<div class="sp-fb bad">❌ <b>拼错了</b> —— ${where}</div>
+      <div class="sp-ans">正确拼写：<b class="ans-word">${w.w}</b>　<span class="muted">你写的：${youWrote || "（空）"}</span></div>
+      <div class="sp-fb retry">💡 输入框已清空 —— 现在<b>照着答案重新拼一遍</b>，拼好才会进入下一题。</div>`;
+  } else if (spChecked) {
+    fb = `<div class="sp-fb good">✅ <b>完全正确！</b>+1 ⭐</div>
+      <div class="sp-ans"><b class="ans-word">${w.w}</b> <span class="muted">${w.cn}</span></div>`;
+    if (spJustFixed) fb += `<div class="sp-fb fixed-note">📕 <b>这个词之前在错题本里，现在拼对了 —— 已标记「已订正」！</b></div>`;
+    fb += `<div class="fb-why">
+      ${fbBlock("📖 " + w.w + " 这个意思是怎么来的", w.root, "root")}
+      ${fbBlock("🧩 " + w.s + " 为什么这样说", w.why, "why")}
+    </div>`;
+  }
+  const revBanner = spReview ? `<div class="rev-banner">🔁 <b>每日复习</b> —— 只复习你错题本里的词（不含新词），拼对就自动订正，做完今天不再提示。</div>` : "";
+  const bd = queueBreakdown(spQueue);
+  const bdText = spReview
+    ? "🔁 复习队列：全部来自错题本"
+    : "🎯 本轮出题（按你该练的程度自动安排）：" +
+      [bd.wrong ? `错题 ${bd.wrong}` : "", bd.weak ? `待巩固 ${bd.weak}` : "",
+       bd.fresh ? `新词 ${bd.fresh}` : "", bd.solid ? `已掌握 ${bd.solid}` : ""]
+        .filter(Boolean).join(" · ");
+  const recCur = recommendMode(spMode);
+  const recLine = recCur
+    ? `<div class="sp-advice">🎚 ${recCur.why} <button class="mini" id="spTakeAdvice">切换难度</button></div>` : "";
+  return `
+  ${revBanner}
+  <h2>⌨️ 拼写练习</h2>
+  <div class="modebar">
+    ${SPELL_MODES.map(m => `<button class="mode ${spMode === m.id ? "on" : ""}" data-mode="${m.id}">
+      <b>${m.name}</b><span>${m.desc}</span></button>`).join("")}
+  </div>
+
+  <div class="card sp">
+    <p class="muted">第 ${spPos + 1} / ${spQueue.length} 题　·　本轮对 ${spScore.r} 错 ${spScore.w}　·　${mode.desc}</p>
+    <div class="bar"><i style="width:${(spPos / spQueue.length) * 100}%"></i></div>
+    <p class="sp-compose muted">${bdText}</p>
+    ${recLine}
+
+    ${prompt}
+
+    <!-- 统一的「下划线填字区」：所有模式都用它，居中、醒目，不用滚动去找。
+         隐藏输入框 #spInput 包在 slots-wrap 内，聚焦时不会再跳回页面顶部。 -->
+    <div class="slots-wrap${spChecked ? " locked" : ""}" id="slotsWrap">
+      <div class="slots word-cells">${spWordCells()}</div>
+      <input id="spInput" class="sp-capture" type="text"
+        autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+        aria-label="在这里拼写英文单词"
+        value="${buildCapture().replace(/"/g, "&quot;")}" ${spChecked ? "disabled" : ""}>
+    </div>
+    ${spMode === "dict" && !spShowAnswer ? `
+      <p class="dict-tip">👆 例句里的下划线会同步显示你填的字母 —— 在上方居中区域直接填，或点例句里的词填都行</p>` : ""}
+
+    <p class="muted center sp-tip" id="spLiveTip">${spRetry
+      ? `照着答案拼一遍　（${spCharsFit().filter(c => c).length} / ${len}）`
+      : spCharsFit().filter(c => c).length === 0
+        ? `点任意下划线定位，直接拼出 ${len} 个字母`
+        : `已填 ${spCharsFit().filter(c => c).length} / ${len} 个格子`}</p>
+
+    ${fb}
+  </div>
+
+  <div class="card">
+    <h3>为什么必须自己拼出来？</h3>
+    <p class="muted">只看不写，大脑不会真正记住。你现在敲的每一遍，都在建立"中文→英文"的直接反应，这个反应能力决定你以后听不懂句子还是听懂了。</p>
+    <p class="muted">提示不够用时点「💡 提示一个字母」，实在想不起来再看答案——但先自己想一想，效果最好。</p>
+  </div>
+
+  <!-- 常驻底部操作栏：永远不用滚动就能点按钮 -->
+  <div class="actionbar">
+    <div class="ab-info">
+      <b>第 ${spPos + 1} / ${spQueue.length} 题</b>
+      <span>${spRetry ? "✍️ 照着答案再拼一次" : spChecked ? (spResult ? "✅ 答对了" : "❌ 拼错了") : "直接在格子里拼写"}</span>
+    </div>
+    <div class="ab-btns">
+      ${spChecked
+        ? `<button class="btn primary" id="spNext">${spPos + 1 < spQueue.length ? "下一题 →" : "看本轮结果"}</button>`
+        : spRetry
+          ? `<button class="btn primary" id="spRetry">我拼好了 ✓</button>`
+          : `<button class="btn primary" id="spCheck">检查 ✓</button>
+             <button class="btn" id="spReveal">💡 提示一个字母</button>
+             <button class="btn" id="spGive">直接看答案</button>`}
+    </div>
+    <div class="ab-keys">
+      <kbd>空格</kbd>${spChecked ? "下一题" : spRetry ? "提交重拼" : "提交"}
+    </div>
+  </div>
+  <div class="ab-space"></div>`;
+}
+
+function spResultScreen() {
+  const b = spLoadBest();
+  const total = spScore.r + spScore.w;
+  const pct = total ? Math.round(spScore.r / total * 100) : 0;
+  const rec = recommendMode(spMode);
+  const bd = queueBreakdown(spQueue);
+  const misN = spQueue.filter(w => w && wStat(w.w).streak === 0 && wStat(w.w).seen > 0).length;
+  return `
+  <h2>本轮结果</h2>
+  <div class="card center">
+    <p class="big">${spScore.r} / ${total}</p>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <p class="muted">正确率 ${pct}%　·　${modeName(spMode)} 模式最高分：${b.r}/${b.r + b.w}</p>
+    <p class="muted">${pct >= 90 ? "非常棒！这个模式可以升到更难的级别了。"
+      : pct >= 60 ? "不错，错的那几个回到「单词卡」再看一遍。"
+      : "别急，这个模式本来就难。建议先用「中→英」模式练熟，再回来挑战。"}</p>
+    <div class="ctrls">
+      <button class="btn primary" id="spAgain">再来一轮</button>
+      <button class="btn" id="spSwitch">换个模式</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>接下来建议</h3>
+    <ul class="tips">
+      ${rec ? `<li><b>${rec.why}</b>（点上面「换个模式」即可切换）</li>` : ""}
+      <li>本轮有 ${bd.wrong} 个错题、${misN} 个还没拼对——它们会被自动安排进你接下来的练习。</li>
+      <li>同一个词要<b>连续拼对 3 次</b>才会被判定为"已掌握"，之后出现的次数会自动变少。</li>
+      <li>「中→英」正确率稳定 90% 以上，就可以转「首字母」模式；熟练后再挑战「听写」。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>你的掌握度分布</h3>
+    ${masteryBars()}
+  </div>`;
+}
+/* 掌握度分布条：把 0~5 级的词数可视化，让"进度"看得见 */
+function masteryBars() {
+  const W = WORDS.length || 1;
+  const cnt = [0, 0, 0, 0, 0, 0];
+  WORDS.forEach(w => cnt[mastery(w.w)]++);
+  return `<div class="mast-list">
+    ${cnt.map((n, lv) => `
+      <div class="mast-row lv-${lv}">
+        <span class="mast-k">${MASTERY_LABEL[lv]}</span>
+        <span class="mast-bar"><i style="width:${Math.round(n / W * 100)}%"></i></span>
+        <span class="mast-n">${n}</span>
+      </div>`).join("")}
+  </div>`;
+}
+function modeName(id) { const m = SPELL_MODES.find(x => x.id === id); return m ? m.name : id; }
+
+function spCheck() {
+  if (spChecked || !spWord) return;
+  const wrongAt = spWrongAt();               // 必须在清空 spChars 之前算，否则位置会算错
+  const ok = wrongAt === 0;
+  // 只有拼对才亮出答案；拼错保持空白，让用户自己重拼（不直接把正确字母填进格子）
+  if (ok) spShowAnswer = true;
+  if (ok) {
+    spChecked = true; spResult = true; spRetry = false;
+    spScore.r++; S.stars++;
+    if (!S.learned.includes(spWord.w)) S.learned.push(spWord.w);
+    markTodayWord(spWord.w);
+    spJustFixed = markFixedWord(spWord.w);   // 拼对了原本错的词 → 标记订正
+    bumpWord(spWord.w, true, spAssisted);    // 计入掌握度（看答案后拼对的不算真会）
+  } else {
+    // 拼错：不给「下一题」，进入重拼阶段，必须自己再拼一遍
+    spChecked = false; spResult = false; spRetry = true;
+    spScore.w++;
+    markWrongWord(spWord.w);                 // 记入错题本（累计次数 + 最后错误日期）
+    bumpWord(spWord.w, false);               // 掌握度连对清零 → 明天还会再来找你
+    spJustFixed = false;
+  }
+  S.todayCount++;
+  spSaveBest(); save();
+
+  // 记住"你原来写错了什么"（用原始输入字符串，不依赖已清空的 spChars），反馈里要用
+  spLastWrong = spInput;
+  if (!ok) { spInput = ""; spChars = []; spCursor = 0; }
+  render();
+  if (!spChecked) {                       // 重拼阶段保持可输入并聚焦
+    const inp = $("#spInput");
+    if (inp && !inp.disabled) {
+      try { inp.focus({ preventScroll: true }); } catch (e) {}
+      syncCapture();
+    }
+  }
+}
+function spNext() {
+  // 未通过时不允许跳过：必须先重拼成功（或点"直接看答案"后再拼）
+  if (!spChecked && !spRetry) return;
+  if (spPos + 1 < spQueue.length) { spPos++; spLoad(); }
+  else {
+    spListDone = true; spSaveBest();
+    if (spReview) { S.lastReview = today(); save(); }   // 复习做完了 → 今天不再提示
+  }
+  render();
+}
+function spRevealOne() {
+  if (spChecked || spReveal >= spWord.w.length) return;
+  spReveal++; spAssisted = true;   // 用了提示 → 这题不算"纯凭记忆写对"
+  render();
+  const el = $("#spInput"); if (el) el.focus({ preventScroll: true });
+}
+/* 「直接看答案」：显示完整单词，但【不直接跳过】——
+   进入"照着抄一遍"的重拼阶段，自己再打一次才放过这一题。
+   这一步很关键：只是看一遍记忆很浅，亲手写一遍才记得住。      */
+function spGiveUp() {
+  if (spChecked) return;
+  const ok = spIsCorrect();
+  if (ok) {                      // 已经拼对了 → 正常走判定流程
+    spCheck();
+    return;
+  }
+  spShowAnswer = true;           // 亮出完整答案（"直接看答案"本就是要展示正确答案）
+  spChecked = false;             // 但还没结束，允许继续拼
+  spRetry = true;                // 标记为重拼阶段
+  spAssisted = true;             // 看了答案 → 之后拼对也不算真会（掌握度不加）
+  spLastWrong = spInput;
+  spInput = ""; spChars = [];
+  render();
+  const inp = $("#spInput");
+  if (inp && !inp.disabled) { try { inp.focus({ preventScroll: true }); } catch (e) {} }
+}
+
+/* 重拼阶段提交：拼对了算过，拼错了继续练（不计入错题，避免打击） */
+function spRetryCheck() {
+  const ok = spIsCorrect();
+  if (ok) {
+    spScore.r++; S.stars++;
+    if (!S.learned.includes(spWord.w)) S.learned.push(spWord.w);
+    markTodayWord(spWord.w);
+    spJustFixed = markFixedWord(spWord.w);
+    bumpWord(spWord.w, true, spAssisted);    // 抄对的（assisted）不算掌握
+    spChecked = true; spResult = true; spRetry = false;
+    spSaveBest(); save(); render();
+  } else {
+    spLastWrong = spInput;
+    spInput = ""; spChars = [];
+    spChecked = false;
+    save();
+    render();
+    const inp = $("#spInput");
+    if (inp && !inp.disabled) { try { inp.focus({ preventScroll: true }); } catch (e) {} }
+  }
+}
+/* ---------- 词源详解 ---------- */
+function viewWordDetail(w) {
+  return `
+  <div class="card detail">
+    <div class="detail-head">
+      <span class="detail-w">${w.w}</span>
+      <span class="detail-ph">${w.ph}</span>
+      <span class="detail-cn">${w.cn}</span>
+    </div>
+    ${w.pos ? `<p class="detail-meta"><b>词性</b>${w.pos}${w.plural ? `　<b>复数</b>${w.plural}` : ""}</p>` : ""}
+
+    ${fbBlock("🧩 这句话为什么这样说", w.why, "why")}
+
+    ${fbBlock("📖 这个意思是怎么来的", w.root, "root")}
+
+    <div class="detail-foot">
+      <button class="btn" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 朗读单词</button>
+      <button class="btn" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 朗读例句</button>
+    </div>
+  </div>`;
+}
+
+/* 例句中文 + 逐词释义 + 用法说明。
+   ★ 听写模式下【判定前一律不显示英文原文和用法】，
+     否则直接把答案摆在眼前，听写就失去意义了。
+     只在判定后（spShowAnswer=true）才揭示。 */
+function sentenceHelp(w) {
+  const revealed = spShowAnswer;
+  if (!revealed) {
+    // 听写中：只给中文意思，英文原文和讲解全部藏着
+    return `
+    <div class="sent-help">
+      <div class="sh-row"><span class="sh-k">句子意思</span><span class="sh-v">${w.sentCn || "—"}</span></div>
+      <div class="sh-row sh-block">
+        <span class="sh-k">听写中</span>
+        <span class="sh-v">先根据中文把单词拼出来，填完才能看到英文原文和讲解。</span>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="sent-help">
+    <div class="sh-row"><span class="sh-k">句子意思</span><span class="sh-v">${w.sentCn || "—"}</span></div>
+    <div class="sh-row sh-block">
+      <span class="sh-k">英文原句</span>
+      <span class="sh-v"><b>${w.s}</b></span>
+    </div>
+    ${w.sentWords && w.sentWords.length ? `
+      <div class="sh-row sh-block">
+        <span class="sh-k">逐词释义</span>
+        <span class="sh-v">
+          ${w.sentWords.map(([e, c]) => `<span class="witem"><b>${e}</b> ${c}</span>`).join("")}
+        </span>
+      </div>` : ""}
+    <div class="sh-row sh-block">
+      <span class="sh-k">本句用法</span>
+      <span class="sh-v">${w.why || "（暂无讲解）"}</span>
+    </div>
+  </div>`;
+}
+
+/* 在例句里把这个单词标出来，让你看到它在句中的位置 */
+function highlightWord(sentence, word) {
+  const safe = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return sentence.replace(new RegExp("(" + safe + ")", "gi"), '<b class="hl">$1</b>');
+}
+/* 例句的中文大意：优先用数据里写好的，没有就退回"结构说明" */
+function sentenceCn(w) {
+  if (w.sentCn) return w.sentCn;
+  return `句中的 ${w.w} 就是「${w.cn}」的意思`;
+}
+
+/* ---------- 词源词典 ---------- */
+function viewEtymon() {
+  return `
+  <h2>📖 词源词典 · 为什么是这个意思</h2>
+  <p class="muted">每个词都有一个故事。知道词根和来历，记单词会容易十倍——因为你在记逻辑，而不是记字母组合。</p>
+  <div class="card">
+    <h3>怎么读这些解释</h3>
+    <ul class="tips">
+      <li><b>词根</b>：单词最早的含义，往往和现在的意思看起来毫不相关。</li>
+      <li><b>同根词</b>：标注出来的属于同一家族，一起记效率最高（如 water → watermelon）。</li>
+      <li><b>读音</b>：词源有时能解释读音规律（如 school 读 /skuːl/，不读 /skool/）。</li>
+      <li>解释里出现的拉丁语、希腊语字根，完全看不懂也没关系，直接记住结论就行。</li>
+    </ul>
+  </div>
+  ${WORDS.map(w => `
+    <details class="card ety">
+      <summary>
+        <span class="et-w">${w.w}</span>
+        <span class="et-cn">${w.cn}</span>
+        <span class="et-ph">${w.ph}</span>
+        ${w.pos ? `<span class="et-pos">${w.pos}</span>` : ""}
+      </summary>
+      ${w.senses ? `<h4>💬 其他常见用法</h4><p class="why">${w.senses}</p>` : ""}
+      ${w.plural ? `<h4>🔢 复数形式</h4><p class="why">${w.plural}</p>` : ""}
+      ${fbBlock("📖 这个意思是怎么来的", w.root, "root")}
+      <h4>🧩 例句为什么这样说</h4>
+      <p class="ex">${w.s}</p>
+      ${w.why ? `<p class="why">${w.why}</p>` : ""}
+      ${w.tip ? `<h4>💡 记忆技巧</h4><p class="why">${w.tip}</p>` : ""}
+    </details>`).join("")}`;
+}
+
+/* ---------- 语法课 ---------- */
+function viewGrammar() {
+  if (lessonIdx !== null) return lessonPage(lessonIdx);
+  // 今天该学哪节：本阶段安排里第一节还没过的过；本阶段都过了就往后取一节没过的。
+  // 所以「今天学这节」这个标记会随你的进度往前挪，不会永远停在第 1 课。
+  const gdone = grammarDoneFn();
+  const tp = todayPlan_raw();
+  let todayLesson = (tp.grammar || []).filter(g => !gdone(g) && GRAMMAR[g])[0];
+  if (todayLesson == null) {
+    todayLesson = (Curriculum.pendingLessons(gdone) || []).filter(g => GRAMMAR[g])[0];
+  }
+  if (todayLesson == null) todayLesson = null;
+  return `
+  <h2>📚 语法课 · 零基础 ${GRAMMAR.length} 讲</h2>
+  <p class="muted">按顺序学，每节包含：讲解 → 规则 → 为什么 → ${GRAMMAR[0].ex.length} 个例句 → 常见错误 → ${GRAMMAR[0].quiz.length} 道测验。<b>看完一定要做测验</b>，会用才算学会。</p>
+  ${todayLesson != null ? `<div class="card tipbox grammar-today">
+    <b>🎯 今天学这节：${String(GRAMMAR[todayLesson].t || "").replace(/^第\d+课：/, "")}</b>
+    <p class="muted">${GRAMMAR[todayLesson].s || ""}　配你现在的阶段：${tp.goal}</p>
+    <button class="btn" data-goto="${todayLesson}">去上这一课 →</button>
+  </div>` : `<div class="card tipbox grammar-today">
+    <b>🏆 ${GRAMMAR.length} 节语法课全部通过</b>
+    <p class="muted">每节测验都过了。想巩固可以重开任意一课再看一遍。</p>
+  </div>`}
+  <div class="grid2">
+  ${GRAMMAR.map((g, i) => {
+    const done = gqState[i] && gqState[i].done;
+    const score = gqState[i] ? gqState[i].right : null;
+    return `
+    <div class="card lesson${i === todayLesson ? " is-today" : ""}" data-grammar="${i}">
+      <div class="lesson-top">
+        <span class="lesson-no">${i + 1}</span>
+        ${i === todayLesson ? `<span class="lesson-today">今天学这节</span>` : ""}
+        ${done ? `<span class="lesson-done">${score} / ${g.quiz.length} ✓</span>` : ""}
+      </div>
+      <h3>${g.t.replace(/^第\d+课：/, "")}</h3>
+      <p class="muted">${g.s}</p>
+      <div class="lesson-meta">
+        <span>📖 ${g.ex.length} 个例句</span>
+        <span>✍️ ${g.quiz.length} 道测验</span>
+      </div>
+      <span class="more">点开学习 →</span>
+    </div>`;
+  }).join("")}
+  </div>
+  <div class="card">
+    <h3>⚠️ 为什么语法不能只背规则</h3>
+    <p class="muted">每条规则背后都有一个原因。搞清楚为什么要加 -s、为什么要倒装，你才不用死记，也能自己造出从没见过的句子。每节课都有「🧩 这条规则为什么这样」的讲解。</p>
+    <p class="muted">更重要的是：每节课最后都有测验。<b>看懂 ≠ 会用</b>，做错的地方才是真正没懂的地方。</p>
+  </div>`;
+}
+
+/* ---------- 单课详情页（点开就是完整一页） ---------- */
+function lessonPage(i) {
+  const g = GRAMMAR[i];
+  const st = gqState[i];
+  return `
+  <button class="btn back-btn" id="backLessons">← 返回课程列表</button>
+
+  <div class="card lesson-page">
+    <h2>${g.t}</h2>
+    <p class="lead">${g.s}</p>
+
+    <h4>📐 规则</h4>
+    <ul class="rules">${g.b.map(x => `<li>${bold(x)}</li>`).join("")}</ul>
+
+    <h4>🧩 这条规则为什么这样</h4>
+    <p class="root">${g.why}</p>
+
+    <h4>💬 例句（${g.ex.length} 条）</h4>
+    <p class="muted">左边是英文（重点词加粗），右边是中文。大声读出来效果最好。</p>
+    <div class="ex-list">
+      ${g.ex.map((x, n) => `<div class="ex-row">
+        <span class="ex-no">${n + 1}</span>
+        <span class="ex-en">${bold(x[0])}</span>
+        <span class="ex-cn">${x[1]}</span>
+        <button class="mini" onclick="speak('${x[0].replace(/\*\*/g, "").replace(/'/g, "\\'")}')">🔊</button>
+      </div>`).join("")}
+    </div>
+
+    <h4>⚠️ 中国人最容易犯的错</h4>
+    <div class="err-box">${g.err.split("\n").map(l => `<p>${l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</p>`).join("")}</div>
+  </div>
+
+  ${quizBlock(i)}
+
+  <div class="lesson-foot">
+    <button class="btn" id="prevLesson" ${i === 0 ? "disabled" : ""}>← 上一课</button>
+    <button class="btn primary" id="nextLesson" ${i === GRAMMAR.length - 1 ? "disabled" : ""}>
+      ${i === GRAMMAR.length - 1 ? "已是最后一课" : "下一课 →"}</button>
+  </div>`;
+}
+
+/* ---------- 课末测验 ---------- */
+/* 确保某课的作答记录已存在（首次进入时调用） */
+function initGQuiz(i) {
+  if (!gqState[i]) {
+    gqState[i] = { picks: new Array(GRAMMAR[i].quiz.length).fill(-1), right: 0, done: false, pastPerfect: false };
+  }
+  return gqState[i];
+}
+
+function quizBlock(i) {
+  const g = GRAMMAR[i];
+  const st = gqState[i];
+  const total = g.quiz.length;
+  const done = st && st.done;
+  const allRight = done && st.right === total;
+
+  return `
+  <div class="card gquiz" id="gquizBox">
+    <h3>✍️ 课堂测验 · ${total} 题</h3>
+    <p class="muted">${done
+      ? (allRight ? "全对！这节语法你掌握了。" : `你答对 ${st.right} / ${total} 题，把错题的解析看一遍再重做。`)
+      : "看完讲解来做题。做错不丢人，那正好告诉你哪里没懂。"}</p>
+
+    ${done ? `
+      <div class="gq-result ${allRight ? "good" : "mid"}">
+        <span class="big">${st.right} / ${total}</span>
+        <span>${allRight ? "完全正确" : "还差一点，把错题看仔细"}</span>
+      </div>
+      <div class="gq-review">
+        ${g.quiz.map((q, n) => {
+          const ok = st.picks[n] === q.a;
+          return `<div class="gq-item ${ok ? "ok" : "bad"}">
+            <div class="gq-q">${n + 1}. ${q.q}</div>
+            ${!ok ? `<div class="gq-your">你的答案：<s>${q.opts[st.picks[n]] ?? "未作答"}</s></div>` : ""}
+            <div class="gq-right">正确答案：<b>${q.opts[q.a]}</b></div>
+            <div class="gq-e">${q.e}</div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="ctrls">
+        <button class="btn primary" id="gqRedo">再练一次</button>
+        ${!allRight ? `<button class="btn" id="gqBackRead">回去看讲解</button>` : ""}
+      </div>
+    ` : `
+      ${g.quiz.map((q, n) => {
+        const picked = st.picks[n];
+        const judged = picked >= 0;
+        const ok = judged && picked === q.a;
+        return `
+      <div class="gq-item ${judged ? (ok ? "ok" : "bad") : "pending"}" id="gqItm${n}">
+        <div class="gq-q">${n + 1}. ${q.q}</div>
+        <div class="gq-opts">
+          ${q.opts.map((o, k) => {
+            let cls = "opt";
+            if (judged) {
+              if (k === q.a) cls += " right";
+              else if (k === picked) cls += " wrong";
+            }
+            return `<button class="${cls}" data-gq="${n}:${k}" ${judged ? "disabled" : ""}>${o}</button>`;
+          }).join("")}
+        </div>
+        ${judged ? `<div class="gq-fb">
+          <div class="gq-verdict ${ok ? "good" : "bad"}">${ok ? "✅ 答对了" : "❌ 答错了"}</div>
+          ${!ok ? `<div class="gq-your">你选：<s>${q.opts[picked]}</s>　正确：<b>${q.opts[q.a]}</b></div>` : ""}
+          <div class="gq-e">${q.e}</div>
+        </div>` : ""}
+      </div>`;
+      }).join("")}
+      <div class="gq-bar">
+        <span>已答 <b>${st.picks.filter(p => p >= 0).length}</b> / ${total} 题　·　答对 <b>${st.right}</b> 题</span>
+        <button class="btn primary" id="gqSubmit" ${st.picks.every(p => p >= 0) ? "" : "disabled"}>
+          ${st.picks.every(p => p >= 0) ? "查看成绩 →" : "全部答完后自动出成绩"}</button>
+      </div>
+      <div class="ctrls">
+        <button class="btn" id="gqHide">先遮住答案自测</button>
+      </div>
+    `}
+  </div>`;
+}
+
+function startGQuiz(i) {
+  const old = gqState[i];
+  gqState[i] = { picks: new Array(GRAMMAR[i].quiz.length).fill(-1), done: false, right: 0,
+                 pastPerfect: old ? old.pastPerfect : false };
+  render();
+}
+/* 点选项 → 立刻判定并显示解析，不用滚到底部点提交 */
+function pickGQuiz(n, k) {
+  const st = initGQuiz(gqIdx);
+  if (st.done) return;
+  const pick = parseInt(k);
+  if (isNaN(pick)) return;
+  if (st.picks[n] === pick) return;              // 重复点同一个不重复计分
+  const q = GRAMMAR[gqIdx].quiz[n];
+
+  st.picks[n] = pick;
+  if (pick === q.a) st.right++;                  // 立刻计分
+
+  store.set(GQ_KEY, JSON.stringify(gqState));
+  save();
+
+  // 全部答完 → 自动出成绩
+  if (st.picks.every(p => p >= 0)) {
+    st.done = true;
+    if (!st.pastPerfect && st.right === GRAMMAR[gqIdx].quiz.length) {
+      S.stars++; st.pastPerfect = true;
+    }
+    S.todayCount++;
+    save();
+  }
+  render();                                       // 重绘显示该题判定 + 解析
+
+  // 没答完时滚到下一题，省得用户自己找
+  if (!st.done) {
+    const nextQ = GRAMMAR[gqIdx].quiz.findIndex((_, i) => st.picks[i] < 0);
+    const box = document.getElementById("gqItm" + nextQ);
+    if (box && box.scrollIntoView) box.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else {
+    const b = $("#gquizBox");
+    if (b && b.scrollIntoView) b.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+function submitGQuiz() {
+  const g = GRAMMAR[gqIdx];
+  const st = initGQuiz(gqIdx);
+  if (st.done) return;
+  const left = st.picks.filter(p => p < 0).length;
+  if (left > 0) { alert("还有 " + left + " 题没选，答完会自动出成绩。"); return; }
+  st.done = true;
+  if (!st.pastPerfect && st.right === g.quiz.length) { S.stars++; st.pastPerfect = true; }
+  S.todayCount++;
+  store.set(GQ_KEY, JSON.stringify(gqState));
+  save();
+  render();
+}
+
+function bold(s) { return String(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+
+
+/* ---------- 口语 ---------- */
+/* 每条结构：英文（主行）→ 音标 + 中文 + 用法提示（副行）→ 朗读按钮 */
+/* ---------- 口语进度：哪几句已经「我会了」 ----------
+   存在 S.phraseDone（存句子下标），「我的」页据此统计学会了多少句。 */
+function phraseDone(i) {
+  return Array.isArray(S.phraseDone) && S.phraseDone.indexOf(i) >= 0;
+}
+function phraseDoneCount() {
+  return Array.isArray(S.phraseDone) ? S.phraseDone.length : 0;
+}
+function togglePhrase(i) {
+  if (!Array.isArray(S.phraseDone)) S.phraseDone = [];
+  const k = S.phraseDone.indexOf(i);
+  if (k >= 0) S.phraseDone.splice(k, 1); else S.phraseDone.push(i);
+  save(); render();
+}
+
+/* ---------- 口语语音识别（听用户读，对比找错） ----------
+   用浏览器自带 Web Speech API（Chrome / Edge 支持）。不支持的浏览器自动隐藏麦克风按钮。 */
+var srIdx = -1, srHeard = "", srActive = false, srCompare = null;
+function hasSpeech() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+function _esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function _norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9'\s]/g, " ").replace(/\s+/g, " ").trim(); }
+function comparePhrase(target, heard) {
+  const t = _norm(target).split(" ");
+  const h = _norm(heard).split(" ");
+  const hset = new Set(h);
+  const words = t.map(w => ({ w, ok: hset.has(w) }));
+  const allOk = words.every(x => x.ok) && Math.abs(t.length - h.length) <= 1;
+  return { words, allOk, heard };
+}
+function startSpeech(idx) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("当前浏览器不支持语音识别，请用 Chrome / Edge 打开本网站。"); return; }
+  if (srActive) return;
+  srActive = true; srIdx = idx; srHeard = ""; srCompare = null; render();
+  let rec;
+  try { rec = new SR(); } catch (e) { srActive = false; render(); return; }
+  rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    try { srHeard = e.results[0][0].transcript; } catch (_) { srHeard = ""; }
+    srCompare = comparePhrase(PHRASES[idx].en, srHeard);
+  };
+  rec.onerror = e => { srHeard = "（没听清：" + (e && e.error ? e.error : "请再试一次") + "）"; };
+  rec.onend = () => { srActive = false; render(); };
+  try { rec.start(); } catch (e) { srActive = false; render(); }
+}
+function phraseCmpHtml() {
+  if (!srCompare) return "";
+  return `
+    <div class="ph-cmp">
+      <div class="ph-heard">你刚才说：<b>${_esc(srHeard)}</b></div>
+      <div class="ph-words">${srCompare.words.map(x => `<span class="cmp ${x.ok ? "ok" : "bad"}">${_esc(x.w)}</span>`).join(" ")}</div>
+      <div class="ph-cmp-tip ${srCompare.allOk ? "ok" : "bad"}">${srCompare.allOk ? "✅ 读得很准，跟原句一致！" : "⚠️ 有词不太对（红色），听原句跟读几遍再试。"}</div>
+    </div>`;
+}
+
+function viewPhrases() {
+  // 今天练哪几句：取本阶段安排的句子里还没会的；都学会了就补后面没会的几句。
+  // 所以每次进来看到的「今天这几句」会随你的进度往前推。
+  const tp = todayPlan_raw();
+  const todaySet = todayPhrases();
+  const todayBlock = todaySet.length ? `
+  <div class="card tipbox phrase-today">
+    <h3>🎯 今天练这几句 <span class="muted">（配你现在的阶段：${tp.goal}）</span></h3>
+    <div class="pt-list">
+      ${todaySet.map(i => {
+        const p = PHRASES[i];
+        return `<div class="pt-row">
+          <span class="pt-en">${p.en}</span>
+          <span class="pt-ipa">${p.ph || ""}</span>
+          <span class="pt-cn">${p.cn}</span>
+          <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊</button>
+          ${hasSpeech() ? `<button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说</button>` : ""}
+          <button class="mini" data-phrase="${i}">我会了</button>
+          ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听…</div>` : ""}
+          ${srIdx === i && srCompare ? phraseCmpHtml(p, i) : ""}
+        </div>`;
+      }).join("")}
+    </div>
+  </div>` : `
+  <div class="card tipbox phrase-today">
+    <h3>🏆 ${PHRASES.length} 句口语全部练完了</h3>
+    <p class="muted">每一句都标记过「我会了」。想继续就点 🔊 再跟读几遍，保持语感。</p>
+  </div>`;
+  return `
+  ${todayBlock}
+  <h2>💬 日常口语 ${PHRASES.length} 句　<span class="ph-count">已会 ${phraseDoneCount()} / ${PHRASES.length}</span></h2>
+  <p class="muted">每句都标了<b>音标</b>，照着念就能读准。点 🔊 可以听发音，然后大声跟读三遍；<b>觉得自己会说这句了，就点「我会了」</b>，进度会记在「我的」里。${hasSpeech() ? ' 若在 <b>Chrome / Edge</b> 里打开，每句还有 🎤 说给我听：你读出来，我听对错并逐词标红。' : ''}</p>
+  <div class="tipbox">
+    <b>怎么练最有效</b>
+    <ol class="tips">
+      <li>先看音标确认每个词怎么读，不确定就点 🔊 听一遍</li>
+      <li>出声读三遍，不要默读 —— 听力是靠嘴巴建立的</li>
+      <li>想象你在跟一个外国人对话，把这句完整说出来</li>
+    </ol>
+  </div>
+  <div class="ph-list">
+  ${PHRASES.map((p, i) => `
+    <div class="card phrase">
+      <div class="ph-idx">${String(i + 1).padStart(2, "0")}</div>
+      <div class="ph-body">
+        <div class="ph-en">${p.en}</div>
+        <div class="ph-second">
+          <span class="ph-ipa">${p.ph || ""}</span>
+          <span class="ph-cn">${p.cn}</span>
+        </div>
+        ${p.tip ? `<div class="ph-tip">💡 ${p.tip}</div>` : ""}
+      </div>
+      <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊 朗读</button>
+      ${hasSpeech() ? `<button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说给我听</button>` : ""}
+      <button class="mini ${phraseDone(i) ? "ph-done" : ""}" data-phrase="${i}">${phraseDone(i) ? "✅ 已会" : "我会了"}</button>
+      ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : ""}
+      ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
+    </div>`).join("")}
+  </div>
+  <div class="card">
+    <h3>⚠️ 为什么音标很重要</h3>
+    <p class="muted">不标音标的话，你只能按字母猜读法，会读错很多。比如 work 里的 or 读 /ɜːr/ 不读 /ɔːr/，th 读 /θ/ 不读 /t/。照着音标念，一开始就练的是正确发音，这比事后纠正省力得多。</p>
+  </div>`;
+}
+function speak(t) {
+  if (!("speechSynthesis" in window)) return alert("当前浏览器不支持朗读");
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.lang = "en-US"; u.rate = 0.85;
+  speechSynthesis.speak(u);
+}
+
+/* ---------- 测验 ---------- */
+function viewQuiz() {
+  if (!qiList.length) newQuiz();
+  const q = qiList[qi];
+  const isLast = qi === qiList.length - 1;
+  // 本题是否已作答：判断依据是"作答记录属于当前题号"，而不是一个布尔标志。
+  // 这样即使中途切到别的页面再回来，状态也不会残留导致点选项没反应。
+  const done = answeredIdx === qi;
+
+  return `
+  <h2>✍️ 测验 · 第 ${qi + 1} / ${qiList.length} 题</h2>
+  <p class="muted">本轮已答对 ${roundRight} 题 · 历史最高 ${S.quizBest} / ${qiList.length}　｜　答对一题 +1 ⭐</p>
+  <div class="bar"><i style="width:${(qi / qiList.length) * 100}%"></i></div>
+
+  <div class="card quizq">
+    <p class="q">${q.q}</p>
+    <div class="opts">
+      ${q.opts.map((o, i) => {
+        let cls = "opt";
+        if (done) {
+          if (i === q.ans) cls += " right";
+          else if (i === answeredPick) cls += " wrong";
+        }
+        return `<button class="${cls}" data-quizopt="${i}" ${done ? "disabled" : ""}>${o}</button>`;
+      }).join("")}
+    </div>
+
+    ${done ? quizFeedback(q, isLast) : ""}
+  </div>
+
+  <!-- 常驻底部操作栏 -->
+  <div class="actionbar">
+    <div class="ab-info">
+      <b>第 ${qi + 1} / ${qiList.length} 题</b>
+      <span>${done ? (answeredPick === q.ans ? "✅ 答对了" : "❌ 答错了") : "选择一个答案"}</span>
+    </div>
+    <div class="ab-btns">
+      ${done
+        ? `<button class="btn primary" id="nextQ">${isLast ? "看本轮结果 →" : "下一题 →"}</button>`
+        : `<span class="ab-tip">点选项，或按数字键 1-4</span>`}
+    </div>
+    <div class="ab-keys">
+      ${done ? "<kbd>空格</kbd>下一题" : ""}
+    </div>
+  </div>
+  <div class="ab-space"></div>`;
+}
+
+function quizFeedback(q, isLast) {
+  const ok = answeredPick === q.ans;
+  // 解析：每题都带「例句 + 中文意思」，详细词再附「为什么这么说」（词源/用法）。
+  // 词库扩充后大部分是精简词，没有词源故事，所以解析要能优雅降级，不能只测 34 个详细词。
+  const explain = `
+    <div class="qz-ex">
+      <div class="qz-ex-en">${highlightWord(q.key.s || "", q.key.w)}</div>
+      <div class="qz-ex-cn">${q.key.sentCn || ""}</div>
+      ${q.key.why ? `<p class="muted">💡 ${q.key.why}</p>` : ""}
+    </div>`;
+  return `
+    ${ok
+      ? `<div class="sp-fb good">✅ 答对了！+1 ⭐</div>
+         <div class="sp-ans">${q.key.w} <span class="muted">${q.key.ph} ${q.key.cn}</span></div>`
+      : `<div class="sp-fb bad">❌ 答错了，正确答案是 <b>${q.key.w}</b>（${q.key.cn}）</div>`}
+    ${explain}`;
+}
+
+function newQuiz() {
+  // 优先考没掌握的词
+  const un = WORDS.filter(w => !S.learned.includes(w.w));
+  const pool = un.length >= 10 ? un : WORDS;
+  qiList = shuffle(pool).slice(0, 10).map(w => {
+    const askCn = Math.random() < 0.5;   // true: 给中文让选英文
+    const wrong = shuffle(WORDS.filter(x => x.w !== w.w)).slice(0, 3);
+    const opts = shuffle([w, ...wrong]);
+    return {
+      q: askCn ? `「${w.cn}」用英语怎么说？` : `单词 “${w.w}” 是什么意思？`,
+      opts: askCn ? opts.map(o => o.w) : opts.map(o => o.cn),
+      ans: opts.indexOf(w),
+      key: w
+    };
+  });
+  qi = 0; answeredIdx = -1; answeredPick = -1; roundRight = 0;
+}
+
+/* 选答案：只改状态，然后整页重绘。UI 完全由状态推导，不可能出现按钮丢失 */
+function pickOption(i) {
+  if (answeredIdx === qi) return;         // 本题已答过，忽略重复点击
+  const q = qiList[qi];
+  answeredPick = parseInt(i);
+  answeredIdx = qi;
+
+  if (answeredPick === q.ans) { roundRight++; S.stars++; bumpWord(q.key.w, true); }
+  else {
+    S.todayCount++;
+    markWrongWord(q.key.w);       // 答错 → 记入错题本
+    bumpWord(q.key.w, false);     // 掌握度清零 → 之后拼写练习会重点出它
+  }
+  save();
+  render();
+}
+
+function quizNext() {
+  if (qi >= qiList.length - 1) return quizResult();
+  qi++;
+  render();
+}
+
+function quizResult() {
+  const score = roundRight, total = qiList.length;
+  const isBest = score > S.quizBest;
+  if (isBest) S.quizBest = score;
+  save();
+  const wrongs = WORDS.filter(w => (S.wrongWords || []).includes(w.w));
+  let msg = `本轮得分：${score} / ${total}\n`;
+  if (isBest && score > 0) msg += `🎉 新纪录！\n`;
+  msg += `\n获得 ${score} ⭐`;
+  if (score === total) msg += "\n\n全对！可以去挑战拼写练习的听写模式了。";
+  else msg += "\n\n错过的单词已记入错词本，建议回「拼写练习」默写一遍。";
+  if (wrongs.length) {
+    msg += `\n\n【错词本 · 共 ${wrongs.length} 个】\n` +
+      wrongs.slice(0, 12).map(w => `${w.w} = ${w.cn}`).join("\n");
+  }
+  alert(msg);
+  newQuiz(); view = "me"; render();
+}
+
+/* ---------- 我的 ---------- */
+function viewMe() {
+  const learned = S.learned;
+  const total = WORDS.length;
+  const mins = S.days.length * 15;
+  const st = stageInfo();
+  const mastered = WORDS.filter(w => mastery(w.w) === 5).length;
+  const rec = recommendMode("cn") || recommendMode("letter") || recommendMode("dict");
+  // 下一步建议：按你的真实数据挑，不再是一堆写死的条目
+  const advice = [];
+  if (openWrongWords().length) advice.push(`错题本还有 <b>${openWrongWords().length}</b> 个没订正，今天先解决它们。`);
+  if (rec) advice.push(rec.why);
+  if (mastered < total) advice.push(`还有 <b>${WORDS.filter(w => mastery(w.w) === 0).length}</b> 个词完全没练过，去「拼写练习」继续。`);
+  else advice.push("所有词都已掌握！可以专心练「听写」模式和口语了。");
+  if (S.days.length < 3) advice.push("才刚开始，先保证连续 3 天都来练 15 分钟。");
+  // 「学了多少」：天数 / 单词 / 口语 / 语法课 —— 全部来自真实进度，不是写死的文案
+  const gd = grammarDoneFn();
+  const gDone = GRAMMAR.map((_, i) => i).filter(gd).length;
+  const pDone = phraseDoneCount();
+  return `
+  <h2>我的学习记录</h2>
+  <div class="card">
+    <h3>📈 学了多少</h3>
+    <div class="home-stats me-stats">
+      <div class="hs ms-days">
+        <span class="hs-ico">🔥</span>
+        <span class="hs-text"><span class="big">${streakDays()}<span class="unit"> 天</span></span>
+          <span class="muted">连续打卡（约 ${mins} 分钟）</span></span>
+      </div>
+      <div class="hs ms-words">
+        <span class="hs-ico">📝</span>
+        <span class="hs-text"><span class="big">${S.learned.length}<span class="unit"> / ${total}</span></span>
+          <span class="muted">已学单词</span></span>
+      </div>
+      <div class="hs ms-phrase">
+        <span class="hs-ico">💬</span>
+        <span class="hs-text"><span class="big">${pDone}<span class="unit"> / ${PHRASES.length}</span></span>
+          <span class="muted">口语句子（点「我会了」记一句）</span></span>
+      </div>
+      <div class="hs ms-grammar">
+        <span class="hs-ico">📚</span>
+        <span class="hs-text"><span class="big">${gDone}<span class="unit"> / ${GRAMMAR.length}</span></span>
+          <span class="muted">语法课（自测做完即算学完）</span></span>
+      </div>
+      <div class="hs ms-stars">
+        <span class="hs-ico">⭐</span>
+        <span class="hs-text"><span class="big">${S.stars}</span>
+          <span class="muted">收集到的星星（每完成一轮今日目标 +1）</span></span>
+      </div>
+      <div class="hs ms-quiz">
+        <span class="hs-ico">🏆</span>
+        <span class="hs-text"><span class="big">${S.quizBest}<span class="unit"> / 10</span></span>
+          <span class="muted">测验历史最高分（每轮 10 题）</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="card grid2">
+    <div><h3>${st.icon} 学习阶段</h3><p class="big">${st.name}</p>
+      <p class="muted">${st.tip}</p></div>
+    <div><h3>🎯 已掌握单词</h3><p class="big">${mastered} / ${total}</p>
+      <p class="muted">连对 3 次算「已掌握」</p></div>
+  </div>
+  <div class="card">
+    <h3>📊 逐级掌握度（共 ${total} 个词）</h3>
+    <p class="muted">连对 3 次算「已掌握」。级别越高，之后出现的次数会自动越少。</p>
+    ${masteryBars()}
+  </div>
+  <div class="card">
+    <h3>下一步建议</h3>
+    <ul class="tips">${advice.map(a => `<li>${a}</li>`).join("")}</ul>
+    <button id="clearBtn" class="btn danger">清空学习记录</button>
+  </div>
+  ${wrongSummary()}${reviewSummary()}${profileCard()}`;
+}
+
+/* ---------- 学习日历 ----------
+   把「连续 / 累计」两个抽象数字变成一张看得见的图：
+   哪天学了（亮）、哪天没学（暗）、今天（框）。
+   顶部点「🔥 连续 N 天」就是进这个页面。 */
+function parseDay(k) { const p = k.split("-").map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+function dayDiff(a, b) { return Math.round((parseDay(b) - parseDay(a)) / 86400000); }
+function longestStreak() {
+  const arr = [...new Set(S.days || [])].sort();
+  let best = 0, cur = 0, prev = null;
+  for (const k of arr) {
+    cur = (prev && dayDiff(prev, k) === 1) ? cur + 1 : 1;
+    if (cur > best) best = cur;
+    prev = k;
+  }
+  return best;
+}
+function viewCalendar() {
+  const set = new Set(S.days || []);
+  const st = streakDays();
+  const total = totalDays();
+  const longest = longestStreak();
+  const lv = fireLevel(st);
+  const WEEKS = 6, days = WEEKS * 7;
+  const todayK = today();
+  // 从今天往前推 (days-1) 天， oldest -> newest
+  const cells = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = dayKey(d);
+    cells.push({ k, dom: d.getDate(), studied: set.has(k), isToday: k === todayK,
+      label: (d.getMonth() + 1) + "月" + d.getDate() + "日" + (k === todayK ? "（今天）" : "") });
+  }
+  const grid = cells.map(c => `
+    <div class="cal-cell ${c.studied ? "studied" : "miss"} ${c.isToday ? "today" : ""}"
+         title="${c.label} · ${c.studied ? "学了 ✓" : "没学"}">
+      <span class="cal-dom">${c.dom}</span>
+      <span class="cal-ico">${c.studied ? "🔥" : (c.isToday ? "📍" : "")}</span>
+    </div>`).join("");
+  const weekHead = ["一", "二", "三", "四", "五", "六", "日"].map(w => `<div class="cal-wh">${w}</div>`).join("");
+  return `
+  <h2>📅 学习日历</h2>
+  <div class="card cal-summary">
+    <div class="cal-stat"><span class="hs-ico fire-lv-${lv}">🔥</span><span class="hs-text"><span class="big">${st}<span class="unit"> 天</span></span><span class="muted">连续打卡 · ${fireLevelName(st)}</span></span></div>
+    <div class="cal-stat"><span class="hs-ico">📆</span><span class="hs-text"><span class="big">${total}<span class="unit"> 天</span></span><span class="muted">累计学习</span></span></div>
+    <div class="cal-stat"><span class="hs-ico">🏆</span><span class="hs-text"><span class="big">${longest}<span class="unit"> 天</span></span><span class="muted">最长连续</span></span></div>
+  </div>
+  <div class="card">
+    <p class="muted">最近 ${WEEKS} 周：亮的是学了的那天，暗的是没学的。断一天连续就归零，所以尽量别断～</p>
+    <div class="cal-grid">
+      ${weekHead}
+      ${grid}
+    </div>
+    <div class="cal-legend">
+      <span><i class="lg studied"></i> 学了</span>
+      <span><i class="lg miss"></i> 没学</span>
+      <span><i class="lg today"></i> 今天</span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>🔥 火花等级</h3>
+    <p class="muted">连续天数越长，火花越旺（颜色越亮）。断一天就从头算起。</p>
+    <div class="fire-legend">
+      ${[0,1,2,3,4,5,6].map(l => `<span class="fire-lv-${l} fl"><b>${["灰","橙","橙红","红","紫","金","彩"][l]}</b><small>${["0 天","1-2 天","3-6 天","7-13 天","14-29 天","30-59 天","60+ 天"][l]}</small></span>`).join("")}
+    </div>
+  </div>
+  <div class="card">
+    <h3>⭐ 关于星星</h3>
+    <p class="muted">每完成一轮「今日目标」就 +1 颗星星：比如今天练满 ${dailyGoal} 个词、做完一次语法自测、或测验满分。星星只是记录你的努力，不会过期、也不会被扣。</p>
+    <p class="muted">想看全部记录，去 <button class="linkbtn" data-chip="me">「我的」页 →</button></p>
+  </div>`;
+}
+
+/* ---------- 阅读页 ----------
+   分级短文：列表（按进度解锁）→ 点开读。两种模式：
+   ① 整段翻译：英文在上，每段可单独「显示/隐藏中文」；
+   ② 填单词：把文中你学过的词挖空，填对变绿。 */
+var readId = "";        // 当前在读的短文下标（"" = 列表）
+var readMode = "trans"; // trans | fill
+var readShowCn = false; // 整段翻译：是否显示全部中文
+
+function readingUnlocked(lv) {
+  // 已掌握词数达到 (lv-1)*20 才解锁对应难度（学到一定程度才出现更难的）
+  return masteredCount() >= (lv - 1) * 20;
+}
+function readBlanks(text) {
+  const learned = new Set(S.learned || []);
+  const known = new Set(WORDS.map(w => w.w));
+  const tokens = text.split(/(\s+)/);
+  let bi = 0;
+  return tokens.map(tok => {
+    const m = tok.match(/^([A-Za-z']+)([^A-Za-z']*)$/);
+    if (!m) return tok;
+    const word = m[1], trail = m[2];
+    const low = word.toLowerCase();
+    let blank = learned.has(low);
+    if (!blank && bi < 6 && known.has(low)) blank = true; // 学过的词不够时，用词库里见过的词补几个
+    if (!blank || bi >= 8) return tok;
+    bi++;
+    return `<input class="rd-blank" data-ans="${low}" maxlength="20" placeholder="?">${trail}`;
+  }).join("");
+}
+function viewRead() {
+  if (readId === "") return readList();
+  const art = READING[readId];
+  if (!art) { readId = ""; return readList(); }
+  const paras = art.en.split(/\n+/).filter(Boolean);
+  const parasCn = art.cn.split(/\n+/).filter(Boolean);
+  const body = readMode === "trans"
+    ? paras.map((p, i) => `
+        <div class="rd-para">
+          <p class="rd-en">${p}</p>
+          <p class="rd-cn" ${readShowCn ? "" : 'style="display:none"'}>${parasCn[i] || ""}</p>
+          <button class="mini rd-toggle" data-rdt="${i}">${readShowCn ? "隐藏中文" : "显示中文"}</button>
+        </div>`).join("")
+    : `<div class="rd-fill">${readBlanks(art.en)}</div>
+       <div class="rd-actions">
+         <button class="btn primary" data-act="rdcheck">核对答案</button>
+         <span class="rd-result" id="rdResult"></span>
+       </div>
+       <p class="muted">把挖空的词填进去，填对变绿、填错变红。</p>`;
+  return `
+  <h2>📖 阅读 · ${art.title}</h2>
+  <div class="card">
+    <div class="rd-bar">
+      <span class="rd-lv">难度 L${art.lv}</span>
+      <span class="rd-topic">${art.topic}</span>
+      <span class="rd-modes">
+        <button class="chip ${readMode === "trans" ? "on" : ""}" data-readmode="trans">整段翻译</button>
+        <button class="chip ${readMode === "fill" ? "on" : ""}" data-readmode="fill">填单词</button>
+      </span>
+      <button class="mini" onclick="speak('${String(art.en).replace(/'/g, "\\'")}')">🔊 朗读</button>
+    </div>
+    ${readMode === "trans"
+      ? `<button class="mini rd-allcn" data-act="rdallcn">${readShowCn ? "隐藏全部中文" : "显示全部中文"}</button>`
+      : ""}
+    ${body}
+  </div>
+  <div class="card">
+    <button class="btn" data-readback="1">← 返回短文列表</button>
+  </div>`;
+}
+function readList() {
+  const items = READING.map((a, i) => {
+    const ok = readingUnlocked(a.lv);
+    const need = (a.lv - 1) * 20;
+    return `<button class="rd-item ${ok ? "" : "locked"}" ${ok ? `data-read="${i}"` : 'disabled'}>
+      <span class="rd-ico">📖</span>
+      <span class="rd-meta">
+        <b>${a.title}</b>
+        <small>${a.topic} · 难度 L${a.lv}</small>
+        ${ok ? "" : `<small class="rd-lock">再掌握 ${Math.max(0, need - masteredCount())} 个词解锁</small>`}
+      </span>
+      <span class="rd-go">${ok ? "读 →" : "🔒"}</span>
+    </button>`;
+  }).join("");
+  return `
+  <h2>📖 阅读</h2>
+  <div class="card">
+    <p class="muted">短文按你的进度逐步解锁：掌握的词越多，越难的短文才会出现。点开可选「整段翻译」或「填单词」两种模式。</p>
+    <div class="rd-list">${items}</div>
+  </div>`;
+}
+function checkReadFill() {
+  let right = 0, total = 0;
+  document.querySelectorAll(".rd-blank").forEach(inp => {
+    total++;
+    const ans = inp.dataset.ans;
+    const val = (inp.value || "").trim().toLowerCase();
+    inp.classList.remove("ok", "bad");
+    if (val === ans) { inp.classList.add("ok"); right++; }
+    else if (val) inp.classList.add("bad");
+  });
+  const el = document.getElementById("rdResult");
+  if (el) el.textContent = total ? `填对 ${right} / ${total}` : "";
+}
+
+/* ---------- 学习档案（多用户）----------
+   同一台电脑可以给多个人用，进度各自独立。 */
+function profileCard() {
+  const me = curProfile();
+  return `
+  <div class="card profile-card">
+    <h3>👤 学习档案</h3>
+    <p class="muted">当前档案：<b>${me.name}</b>　（目标：${me.goal}　·　计划每天 ${me.minutes} 分钟　·　加入于 ${me.createdAt}）</p>
+    <p class="muted">每个档案的<b>学习进度、错题本、星星完全独立</b>。家里几个人共用一台电脑时，各用各的档案，互不影响。</p>
+    <div class="prof-list">
+      ${PROFILES.map(p => `
+        <button class="prof-item ${p.id === profileId ? "on" : ""}" data-prof="${p.id}">
+          <span class="prof-name">${p.name}${p.id === profileId ? "（当前）" : ""}</span>
+          <span class="prof-meta">目标：${p.goal} · 每天 ${p.minutes} 分钟 · 加入于 ${p.createdAt}</span>
+        </button>`).join("")}
+    </div>
+    <div class="prof-actions">
+      <input id="newProfName" class="prof-input" type="text" placeholder="新档案名字（如：小明）" maxlength="12">
+      <button class="btn primary" id="addProf">＋ 新建档案</button>
+      ${PROFILES.length > 1 ? `<button class="btn danger" id="delProf">删除当前档案</button>` : ""}
+    </div>
+  </div>`;
+}
+
+/* 「我的」页里的错题本入口：给个概览 + 按钮跳到独立错题本页面 */
+function wrongSummary() {
+  const all = (S.wrongWords || []).length;
+  const open = openWrongWords().length;
+  if (!all) return `
+  <div class="card">
+    <h3>📕 错题本</h3>
+    <p class="muted">还没有错词。测验和拼写做错的词会自动收集到错题本，方便你针对性复习。</p>
+  </div>`;
+  return `
+  <div class="card">
+    <h3>📕 错题本 · 共 ${all} 个</h3>
+    <p class="muted">${open ? `其中 <b>${open}</b> 个还没订正（还没搞懂的）。` : "全部都订正过啦，很棒！"}点进错题本可以逐条查看词性和单复数，并直接发起针对性默写。</p>
+    <button class="btn primary" id="goWrong">打开错题本 →</button>
+  </div>`;
+}
+
+/* 「我的」页里的今日复习入口 */
+function reviewSummary() {
+  const hasWrong = (S.wrongWords || []).length > 0;
+  const done = S.lastReview === today();
+  if (!hasWrong) return `
+  <div class="card">
+    <h3>🔁 每日复习</h3>
+    <p class="muted">复习<b>只出错题</b>。现在错题本是空的，今天没有需要复习的词 ✅</p>
+  </div>`;
+  return `
+  <div class="card">
+    <h3>🔁 每日复习</h3>
+    <p class="muted">${done ? "今天的复习已完成 ✅，明天再来。" : "今天的复习还没做。复习只会出你错题本里的词（先还没订正的，再已订正的），不会出新词。"}</p>
+    <button class="btn" id="goReview">${done ? "再复习一遍" : "开始今天的复习 →"}</button>
+  </div>`;
+}
+
+/* 每天第一次进来 → 先落在「每日复习」页。
+   只在【错题本里有词】时才拦一下（复习只出错题，没错题就不打扰）。
+   reviewSeen 记"今天已经展示过复习页"，避免刷新后又强制弹回；
+   lastReview 记"今天复习真的做完了"（用于页面上的完成状态）。 */
+try {
+  const hasWrong = (S.wrongWords || []).length > 0;
+  if (hasWrong && S.reviewSeen !== today()) {
+    view = "review";
+    S.reviewSeen = today(); save();
+  }
+} catch (e) { console.error("复习着陆判断失败", e); }
+
+render();
+
+/* 启动：先立即渲染（用内置基础词库 + 「生成中」横幅），
+   再异步去联网抓取/生成今日单词，完成后会自动再渲染一次。
+   本地直接打开（file://）或离线时，云服务会因域名不匹配而失败，
+   此时 daily.js 会自动回落到内置词库——网站照常可用。 */
+if (window.DailyEngine && window.DailyEngine.loadDailyWords) {
+  window.DailyEngine.loadDailyWords().catch(function (e) {
+    console.error("每日单词加载失败：", e);
+  });
+}
