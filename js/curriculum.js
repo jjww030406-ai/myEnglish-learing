@@ -35,7 +35,7 @@ var CURRICULUM = [
     goal: "能聊频率、能说将来的打算" },
   { id: "s12", wpd: 12, grammar: [14, 15],     phrases: [32, 33, 34],       need: 238,
     goal: "能用完成时聊经历，能提建议" },
-  { id: "s13", wpd: 12, grammar: [16, 17],     phrases: [35, 36, 37],       need: 272,
+  { id: "s13", wpd: 12, grammar: [16, 17],     phrases: [35, 36, 37],       need: 240,
     goal: "能用连词把句子连起来，能说数量多少" },
   { id: "s14", wpd: 12, grammar: [18, 19],     phrases: [38, 39, 40],       need: 0,
     goal: "自由交流：把学过的词和句型组合起来聊任何话题，并开始读短文" }
