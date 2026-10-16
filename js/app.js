@@ -19,7 +19,7 @@ const PAGE_META = {
   me:      { icon: "📈", title: "我的",     sub: "学习记录、星星、打卡与错词本" },
   today:   { icon: "📅", title: "今日任务", sub: "今天该学哪些词、哪些句子，哪些还没学" },
   wrong:   { icon: "📕", title: "错题本",   sub: "拼错/答错的词，逐条订正才算掌握" },
-  review:  { icon: "🔁", title: "每日复习", sub: "先复习旧词再学新词，错词优先" },
+  review:  { icon: "🔁", title: "每日复习", sub: "复习你学会过的词：错词优先，再抽旧词防遗忘" },
   calendar:{ icon: "📅", title: "学习日历", sub: "哪天学了、哪天没学，连续打卡一目了然" },
   read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" }
 };
@@ -705,7 +705,9 @@ function bind() {
   }
   const l = $("#learnBtn");
   if (l) l.onclick = () => {
-    const w = WORDS[currentWordIndex()];
+    // 用屏幕上正在显示的这张卡（curCard）。不能重新调 currentWordIndex()——
+    // cardWord 为空时它会再随机一次，导致「点学会了、记下的却是另一个词」。
+    const w = curCard || WORDS[currentWordIndex()];
     if (!S.learned.includes(w.w)) {
       S.learned.push(w.w);
       S.todayCount++;
@@ -1090,7 +1092,7 @@ function viewHome() {
     + proverbHtml();
   const cards = [
     // 「每日复习」原本只靠顶部切换条进入；切换条移除后必须在这里留一个入口，否则该页会成为孤儿。
-    { v: "review",  c: "review",  icon: "🔁", t: "每日复习", d: wrongCount ? `你有 ${wrongCount} 个错词等着复习，先复习再学新词。` : "先复习旧词再学新词；现在错题本是空的，可以先去学新词。" },
+    { v: "review",  c: "review",  icon: "🔁", t: "每日复习", d: wrongCount ? `你有 ${wrongCount} 个错词等着订正，复习会先安排它们，再抽你学会的旧词。` : `复习你学会过的旧词（现在 ${S.learned.length} 个），错词优先，防止学了就忘。` },
     { v: "spell",   c: "spell",   icon: "⌨️", t: "拼写练习", d: "看中文，把英文一个字母一个字母敲出来。最核心的一步。" },
     { v: "cards",   c: "cards",   icon: "🃏", t: "单词卡",   d: "看中文、例句，点开看词性、单复数和词源详解。" },
     { v: "wrong",   c: "wrong",   icon: "📕", t: "错题本",   d: wrongCount ? `你有 ${wrongCount} 个还没订正的错词，点进来逐个攻克。` : "拼错/答错的词会收在这里，逐条订正才算掌握。" },
@@ -1497,11 +1499,17 @@ function wrongWordCard(w, isFixed) {
    错题本为空时返回空数组，页面会提示"今天没有要复习的错题"。 */
 const REVIEW_SIZE = 8;
 function reviewQueue() {
+  // 复习 = 你学过的词。错词优先（没订正的在前，已订正的在后），其余从「已学会的词」里抽。
   const open = shuffle(openWrongWords().map(findWord).filter(Boolean));
   const openSet = new Set(open.map(w => w.w));
   const fixed = shuffle((S.wrongWords || [])
     .map(findWord).filter(Boolean).filter(w => !openSet.has(w.w)));
-  return open.concat(fixed).slice(0, REVIEW_SIZE);
+  const wrong = open.concat(fixed);
+  const wrongSet = new Set(wrong.map(w => w.w));
+  // 已学会但不在错题里的词：打乱后补进队列 —— 复习旧词，防止学了就忘
+  const learnedWords = shuffle((S.learned || [])
+    .map(findWord).filter(Boolean).filter(w => !wrongSet.has(w.w)));
+  return wrong.concat(learnedWords).slice(0, REVIEW_SIZE);
 }
 function startReview() {
   const q = reviewQueue();
@@ -1522,17 +1530,17 @@ function practiceOneWord(word) {
 }
 function viewReview() {
   const openN = openWrongWords().length;
-  const totalN = (S.wrongWords || []).length;
+  const learnedN = (S.learned || []).length;
   const q = reviewQueue();
   const done = S.lastReview === today();
 
-  if (!q.length) {
+  if (!learnedN) {
     return `
     <div class="card wrong-empty">
       <div class="we-ico">🎉</div>
-      <h3>今天没有需要复习的错题</h3>
-      <p class="muted">复习<b>只出错题</b>——你拼错或答错过的词。现在错题本是空的，说明之前的错词都订正过了，很棒！</p>
-      <p class="muted">去「⌨️ 拼写练习」学几个新词吧。以后有了错词，第二天这里会自动帮你复习。</p>
+      <h3>先学会第一个词，再来复习</h3>
+      <p class="muted">复习页里出现的<b>全是你学过的词</b>——你在单词卡、拼写练习里点过「我学会了」的词都会进来，错过的错词排在最前面。</p>
+      <p class="muted">现在你还没学会任何词，先去「⌨️ 拼写练习」或「🃏 单词卡」学几个吧。</p>
       <div class="rev-actions">
         <button class="btn primary" data-v="spell" id="revGoSpell">⌨️ 去拼写练习学新词</button>
         <button class="btn" data-back="home" id="revGoHome">返回首页</button>
@@ -1545,15 +1553,15 @@ function viewReview() {
       <span class="rev-emoji">🔁</span>
       <div>
         <h3>${done ? "今天的复习已完成 ✅" : "今天的复习还没做"}</h3>
-        <p class="muted">每天第一次来，先把<b>错题</b>重新默写一遍。记忆靠的是"隔天再想起来"，不是一次性背很多遍。</p>
+        <p class="muted">复习的都是<b>你已经学会的词</b>：先把你还没订正的错词重新默写，再抽几个以前学会的旧词，防止学了就忘。</p>
       </div>
     </div>
     <div class="rev-grid">
       <div class="rev-cell"><b>${q.length}</b><span>本轮复习词数</span></div>
-      <div class="rev-cell"><b>${openN}</b><span>错题待订正</span></div>
-      <div class="rev-cell"><b>${totalN}</b><span>错题本累计</span></div>
+      <div class="rev-cell"><b>${openN}</b><span>错词待订正</span></div>
+      <div class="rev-cell"><b>${learnedN}</b><span>累计学会的词</span></div>
     </div>
-    <p class="muted">复习<b>只出错题</b>：先安排你还没订正的，再复习已经订正过的。<b>不会出现没学过的新词。</b>拼对错题本里的词，会自动标记「已订正」。</p>
+    <p class="muted">队列规则：<b>错词优先</b>（还没订正的排最前）→ 已订正的错词 → 其他学会的旧词。<b>绝不会出现没学过的新词。</b>拼对错词会自动标记「已订正」。</p>
     <div class="rev-actions">
       <button class="btn primary" id="startReview">▶ 开始复习（${q.length} 个词）</button>
       <button class="btn" id="skipReview">今天先跳过</button>
@@ -1562,8 +1570,8 @@ function viewReview() {
   <div class="card">
     <h3>为什么每天先复习？</h3>
     <ul class="tips">
-      <li><b>复习比学新词更重要。</b>昨天拼错的词，今天还能默写出来，才算真的记住。</li>
-      <li>复习<b>只出错题</b>，那些"似会非会"的词正是最容易忘的；绝不会混进没学过的新词来干扰你。</li>
+      <li><b>复习比学新词更重要。</b>学过的词隔天还能默写出来，才算真的记住。</li>
+      <li>点过「我学会了」的词在<b>新词里出现得更少</b>，把位置留给没学过的；但它们会<b>定期回到这里</b>让你再过一遍。</li>
       <li>复习最多 ${REVIEW_SIZE} 个词，两三分钟，不占时间，但效果最大。</li>
     </ul>
   </div>`;
@@ -1818,7 +1826,7 @@ function viewSpell() {
       ${fbBlock("🧩 " + w.s + " 为什么这样说", w.why, "why")}
     </div>`;
   }
-  const revBanner = spReview ? `<div class="rev-banner">🔁 <b>每日复习</b> —— 只复习你错题本里的词（不含新词），拼对就自动订正，做完今天不再提示。</div>` : "";
+  const revBanner = spReview ? `<div class="rev-banner">🔁 <b>每日复习</b> —— 全是你学会过的词：错词排最前，拼对就自动订正；其余是抽出来防遗忘的旧词，不含新词。</div>` : "";
   const bd = queueBreakdown(spQueue);
   const bdText = spReview
     ? "🔁 复习队列：全部来自错题本"
@@ -3119,7 +3127,7 @@ function reviewSummary() {
   return `
   <div class="card">
     <h3>🔁 每日复习</h3>
-    <p class="muted">${done ? "今天的复习已完成 ✅，明天再来。" : "今天的复习还没做。复习只会出你错题本里的词（先还没订正的，再已订正的），不会出新词。"}</p>
+    <p class="muted">${done ? "今天的复习已完成 ✅，明天再来。" : "今天的复习还没做。复习出的是你学会过的词：先还没订正的错词，再抽学会的旧词，不会出新词。"}</p>
     <button class="btn" id="goReview">${done ? "再复习一遍" : "开始今天的复习 →"}</button>
   </div>`;
 }
