@@ -1243,10 +1243,19 @@ function todayPlan() {
 /* ---------- 今日已学单词 ---------- */
 /* 今天该练哪几句口语（进度驱动）：本阶段安排的句子里还没会的；
    都学会了就往后补几句还没会的。口语页和今日任务页共用同一套算法。 */
+function curStageLevel() {
+  var mc = (typeof masteredCount === "function") ? masteredCount() : 0;
+  var lvl = 1;
+  if (typeof CURRICULUM !== "undefined") {
+    for (var i = 0; i < CURRICULUM.length; i++) { if (mc >= (CURRICULUM[i].need || 0)) lvl = i + 1; }
+  }
+  return lvl;
+}
 function todayPhrases() {
-  const tp = todayPlan_raw();
   const doneSet = new Set(S.phraseDone || []);
-  let list = (tp.phrases || []).filter(i => !doneSet.has(i));
+  const lvl = curStageLevel();
+  // 按用户当前阶段 level 选句：已掌握词越多，可练的口语 level 越高、库越大（动态，不固定 72 句）
+  let list = PHRASES.map((_, i) => i).filter(i => (PHRASES[i].level || 1) <= lvl && !doneSet.has(i));
   if (!list.length) list = PHRASES.map((_, i) => i).filter(i => !doneSet.has(i)).slice(0, 3);
   return list;
 }
@@ -2145,8 +2154,16 @@ function viewGrammar() {
   </div>`}
   <div class="grid2">
   ${GRAMMAR.map((g, i) => {
+    const lvl = curStageLevel();
+    const locked = (g.level || 1) > lvl;
     const done = gqState[i] && gqState[i].done;
     const score = gqState[i] ? gqState[i].right : null;
+    if (locked) return `
+    <div class="card lesson locked">
+      <div class="lesson-top"><span class="lesson-no">${i + 1}</span><span class="lesson-lock">🔒 学到第 ${g.level || 1} 阶段解锁</span></div>
+      <h3>${g.t.replace(/^第\d+课：/, "")}</h3>
+      <p class="muted">${g.s}</p>
+    </div>`;
     return `
     <div class="card lesson${i === todayLesson ? " is-today" : ""}" data-grammar="${i}">
       <div class="lesson-top">
@@ -3129,6 +3146,24 @@ if (window.CloudSync && window.CloudSync.enabled && window.CloudSync.restore()) 
 if (window.DailyEngine && window.DailyEngine.loadDailyWords) {
   window.DailyEngine.loadDailyWords().catch(function (e) {
     console.error("每日单词加载失败：", e);
+  });
+}
+/* 口语同样动态装配：基础 72 + 分级语料(phrases-extra.js) + 云端共享，
+   今日练哪几句由 todayPhrases() 按学习阶段 level 过滤，库随进度长大不再固定 72 句 */
+if (window.DailyEngine && window.DailyEngine.loadDailyPhrases) {
+  window.DailyEngine.loadDailyPhrases().then(function () { render(); }).catch(function (e) {
+    console.error("口语动态加载失败：", e);
+  });
+}
+/* 阅读 / 语法同样动态装配：基础内容 + 分级语料 + 云端共享，按阶段 level 解锁，库随进度长大 */
+if (window.DailyEngine && window.DailyEngine.loadDailyReading) {
+  window.DailyEngine.loadDailyReading().then(function () { render(); }).catch(function (e) {
+    console.error("阅读动态加载失败：", e);
+  });
+}
+if (window.DailyEngine && window.DailyEngine.loadDailyGrammar) {
+  window.DailyEngine.loadDailyGrammar().then(function () { render(); }).catch(function (e) {
+    console.error("语法动态加载失败：", e);
   });
 }
 
