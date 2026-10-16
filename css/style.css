@@ -2497,3 +2497,20 @@ h2 { margin: 4px 0 14px; }
 /* 修复：顶栏 LOGO 的 🦉 被 .brand 的 background-clip:text + color:transparent
    连坐（子元素继承透明填充），在某些环境直接隐身。显式恢复文字填充色。 */
 .top .brand .logo { color: initial; -webkit-text-fill-color: initial; }
+
+/* ===== 整页铺满：不再把内容锁在 1040px 中间，两侧留白收掉 =====
+   网格列数改成按屏宽自适应，屏幕越宽卡片自然排越多列，
+   所以宽屏上是「更多内容」而不是「更大的留白」。 */
+.wrap { max-width: 100%; padding: 24px 26px 96px; }
+
+/* 模块卡网格：最小 300px，宽屏自动多列（1440→4 列，1920→6 列，2560→8 列） */
+.nav-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+@media (max-width: 900px) { .nav-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .nav-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .nav-grid { grid-template-columns: 1fr; } }
+
+/* 顶部统计条：6 格在宽屏上均匀铺满一行 */
+.home-stats { grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); }
+
+/* Hero 文案放宽一点，避免大屏上文字只占左侧一小条 */
+.hero-inner { max-width: 780px; }
