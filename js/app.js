@@ -452,6 +452,12 @@ function render() {
   } catch (e) {
     console.error("bind 出错", e);
   }
+  // 动态词源：渲染后填充页面上所有 [data-etym] 占位（运行时从网络抓取，限并发）
+  try {
+    if (window.Etym) window.Etym.hydrate();
+  } catch (e) {
+    console.error("etym hydrate 出错", e);
+  }
 }
 
 /* 每日单词状态横幅（联网获取中 / 已就绪 / 离线回落） */
@@ -550,6 +556,13 @@ function dailyBanner() {
 function fbBlock(title, text, cls) {
   if (!text) return "";
   return `<h4>${title}</h4><p class="${cls || "why"}">${text}</p>`;
+}
+
+// 词源块：有缓存的故事就直接显示；没有就放一个占位节点，由动态词源引擎(etym.js)运行时抓取后填入。
+function etymBlockFor(w) {
+  if (w && w.root) return fbBlock("📖 这个意思是怎么来的", w.root, "root");
+  var word = (w && w.w) || "";
+  return `<span class="etym-dyn" data-etym="${word}">📖 <span class="muted">正在从网络抓取这个词源故事…</span></span>`;
 }
 
 function bind() {
@@ -1801,7 +1814,7 @@ function viewSpell() {
       <div class="sp-ans"><b class="ans-word">${w.w}</b> <span class="muted">${w.cn}</span></div>`;
     if (spJustFixed) fb += `<div class="sp-fb fixed-note">📕 <b>这个词之前在错题本里，现在拼对了 —— 已标记「已订正」！</b></div>`;
     fb += `<div class="fb-why">
-      ${fbBlock("📖 " + w.w + " 这个意思是怎么来的", w.root, "root")}
+      ${etymBlockFor(w)}
       ${fbBlock("🧩 " + w.s + " 为什么这样说", w.why, "why")}
     </div>`;
   }
@@ -2039,7 +2052,7 @@ function viewWordDetail(w) {
 
     ${fbBlock("🧩 这句话为什么这样说", w.why, "why")}
 
-    ${fbBlock("📖 这个意思是怎么来的", w.root, "root")}
+    ${etymBlockFor(w)}
 
     <div class="detail-foot">
       <button class="btn" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 朗读单词</button>
@@ -2121,7 +2134,7 @@ function viewEtymon() {
       </summary>
       ${w.senses ? `<h4>💬 其他常见用法</h4><p class="why">${w.senses}</p>` : ""}
       ${w.plural ? `<h4>🔢 复数形式</h4><p class="why">${w.plural}</p>` : ""}
-      ${w.root ? fbBlock("📖 这个意思是怎么来的", w.root, "root") : `<h4>📖 这个故事正在整理中</h4><p class="why muted">更多单词的来源故事会持续补充进来。</p>`}
+      ${etymBlockFor(w)}
       <h4>🧩 例句为什么这样说</h4>
       <p class="ex">${w.s}</p>
       ${w.why ? `<p class="why">${w.why}</p>` : ""}
@@ -3162,6 +3175,13 @@ if (window.DailyEngine && window.DailyEngine.loadDailyReading) {
 if (window.DailyEngine && window.DailyEngine.loadDailyGrammar) {
   window.DailyEngine.loadDailyGrammar().then(function () { render(); }).catch(function (e) {
     console.error("语法动态加载失败：", e);
+  });
+}
+/* 词源同样动态：预载全站共享词源缓存（其他用户抓过的直接复用），
+   页面打开后再按需从 Wiktionary 实时抓取新词词源 —— 不再固定 253 个 */
+if (window.Etym && window.Etym.loadShared) {
+  window.Etym.loadShared().then(function () { render(); }).catch(function (e) {
+    console.error("共享词源预载失败：", e);
   });
 }
 
