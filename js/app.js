@@ -2887,12 +2887,9 @@ function readBlanks(text) {
     const ph = w.ph || "";
     const safe = low.replace(/'/g, "\\'");
     return `<span class="rd-blk">
-      ${cn ? `<span class="rd-blk-cn">${cn}</span>` : ""}
-      <span class="rd-blk-box">
-        <input class="rd-blank" data-ans="${low}" data-ph="${ph}" placeholder="填单词" maxlength="20">
+        <input class="rd-blank" data-ans="${low}" data-ph="${ph}" placeholder="" maxlength="20" aria-label="填单词">
         ${ph ? `<button type="button" class="rd-blk-spk" onclick="speak('${safe}')" title="听这个词的发音">🔊</button>` : ""}
-      </span>
-    </span>${trail}`;
+      </span>${trail}`;
   }).join("");
 }
 function viewRead() {
@@ -2909,11 +2906,12 @@ function viewRead() {
           <button class="mini rd-toggle" data-rdt="${i}">${readShowCn ? "隐藏中文" : "显示中文"}</button>
         </div>`).join("")
     : `<div class="rd-fill">${readBlanks(art.en)}</div>
+       <div class="rd-cn-block">📖 中文意思（先读熟，再对照填词）：<br>${art.cn}</div>
        <div class="rd-actions">
          <button class="btn primary" data-act="rdcheck">核对答案</button>
          <span class="rd-result" id="rdResult"></span>
        </div>
-       <p class="muted">把挖空的词填进去，填对变绿、填错变红。</p>`;
+       <p class="muted">照着下面的中文意思，把英文里挖空的下划线处填上对应单词，填对变绿、填错变红。</p>`;
   return `
   <h2>📖 阅读 · ${art.title}</h2>
   <div class="card">
