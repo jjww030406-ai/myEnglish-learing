@@ -287,6 +287,34 @@
     return PHRASES;
   }
 
+  /* ---------------- 自建 Python 后端（可选层）----------------
+     填了 CLOUD_CONFIG.backend 后，补词走 /api/enrich（服务端爬词典 + AI 整理），
+     不填或后端没出结果时自动回落原直连管线，绝不卡住。 */
+  function backendBase() {
+    var b = (window.CLOUD_CONFIG && window.CLOUD_CONFIG.backend) || "";
+    b = (b || "").trim();
+    return b ? b.replace(/\/+$/, "") : "";
+  }
+  async function enrichWord(w) {
+    var base = backendBase();
+    if (!base) return null;
+    try {
+      var r = await fetch(base + "/api/enrich", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: w })
+      });
+      if (!r.ok) return null;
+      var j = await r.json();
+      if (j && j.ai) {
+        var p = extractJSON(j.ai);
+        if (p && p.cn) {
+          return { w: w, ph: p.ph || "", cn: p.cn, s: p.s || w, sentCn: p.sentCn || "", pos: p.pos || "", def: p.cn, src: "backend" };
+        }
+      }
+      return null;   // 后端没给结构化结果 → 回落原管线
+    } catch (e) { return null; }
+  }
+
   /* ---------------- 主流程 ---------------- */
   async function loadDailyWords() {
     var dateStr = localDateStr();
@@ -327,6 +355,17 @@
     var done = 0;
     var results = await mapLimit(need, 4, function (w) {
       return (async function () {
+        // 优先走自建 Python 后端：服务端爬词典 + AI 整理（绕过 CORS、藏 key）
+        if (backendBase()) {
+          var be = await enrichWord(w);
+          if (be) {
+            done++;
+            window.DAILY_INFO = { status: "loading", text: "🌐 正在" + makeupNote + "新词… (" + done + "/" + need.length + ")" };
+            safeRender();
+            return be;
+          }
+          // 后端未出结果（没配 key / 网络异常）→ 回落原直连管线
+        }
         var dict = await fetchDict(w);
         var extra = (seed[w]) || null;
         if (!extra) { var cn = await fetchCn(w); if (cn) extra = { cn: cn }; }   // 翻译 API：中文零依赖兜底
