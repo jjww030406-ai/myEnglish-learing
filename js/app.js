@@ -5,7 +5,7 @@ const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
   today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
-  phrasals: viewPhrasals
+  phrasals: viewPhrasals, sent: viewSent
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -23,7 +23,8 @@ const PAGE_META = {
   wrong:   { icon: "📕", title: "错题本",   sub: "拼错/答错的词，逐条订正才算掌握" },
   review:  { icon: "🔁", title: "每日复习", sub: "复习你学会过的词，每天抽几个防遗忘" },
   calendar:{ icon: "📅", title: "学习日历", sub: "哪天学了、哪天没学，连续打卡一目了然" },
-  read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" }
+  read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" },
+  sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" }
 };
 
 /* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
@@ -399,7 +400,7 @@ function render() {
 
   const labels = {
     home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
-    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法"
+    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法", sent: "🧩 拼句打字"
   };
 
   let body;
@@ -953,7 +954,18 @@ function bind() {
   /* 全局快捷键：拼写页用空格/回车进下一题，测验页用空格/回车进下一题，
      数字键 1-4 直接选选项 —— 全程不用碰鼠标 */
   document.onkeydown = (e) => {
-    if (e.key === "F5" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "F5") return;
+    // 拼句打字：Ctrl+1 朗读整句 / Ctrl+; 重打本句（要先于"Ctrl 直接 return"的判断）
+    if (view === "sent" && stList.length && e.ctrlKey) {
+      if (e.key === "1" || e.code === "Digit1") {
+        e.preventDefault(); safe2(() => speak(stList[stIdx].en), "朗读句子"); return;
+      }
+      if (e.key === ";" || e.code === "Semicolon") {
+        e.preventDefault(); safe2(() => { stDone = []; stFinished = false; stErrThis = 0; render(); }, "重打本句"); return;
+      }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const tag = (e.target && e.target.tagName || "").toLowerCase();
     const inInput = tag === "input" || tag === "textarea";
 
@@ -965,6 +977,12 @@ function bind() {
       }
       if (inInput && e.key === " " && spChecked) {
         e.preventDefault(); safe2(spNext, "下一题"); return;
+      }
+    }
+    if (view === "sent" && stList.length) {
+      // 整句拼完：空格 / 回车 → 下一句
+      if (stFinished && (e.key === " " || e.key === "Spacebar" || e.key === "Enter")) {
+        e.preventDefault(); safe2(sentNext, "下一句"); return;
       }
     }
     if (view === "quiz" && qiList.length) {
@@ -981,6 +999,29 @@ function bind() {
       }
     }
   };
+
+  // 拼句打字：开始按钮 / 下一句
+  document.querySelectorAll("[data-act='stStart']").forEach(b =>
+    b.onclick = () => startSentRound());
+  document.querySelectorAll("[data-act='stNext']").forEach(b =>
+    b.onclick = () => sentNext());
+  document.querySelectorAll("[data-act='stAgain']").forEach(b =>
+    b.onclick = () => { stDone = []; stFinished = false; stErrThis = 0; render(); });
+  document.querySelectorAll("[data-act='stSay']").forEach(b =>
+    b.onclick = () => { if (stList.length) speak(stList[stIdx].en); });
+
+  // 拼句打字：输入框实时判定（不重渲染，保持焦点）
+  const stInp = $("#stInput");
+  if (stInp) stInp.oninput = () => onSentType(stInp);
+  if (stInp) stInp.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitSentWord(stInp); }
+  };
+
+  // 进拼句页自动聚焦输入框
+  if (view === "sent" && stList.length && !stFinished) {
+    const si = $("#stInput");
+    if (si) { try { si.focus({ preventScroll: true }); } catch (e) {} }
+  }
 
   /* 测验 */
   document.querySelectorAll("[data-quizopt]").forEach(el => {
@@ -1115,6 +1156,7 @@ function viewHome() {
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
     { v: "phrasals", c: "phrasals", icon: "🔗", t: "用法",   d: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词（look for / get up / turn on…），每个配中文意思 + 例句 + 翻译。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
+    { v: "sent",    c: "sent",    icon: "🧩", t: "拼句打字", d: (typeof SENTENCES !== "undefined" ? SENTENCES.length : 0) + " 个日常句子：看中文，逐词敲出英文，拼对的词变成彩色卡片，越连越上瘾。" },
     { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "每轮从你当前的词库随机抽 10 题（中→英 / 英→中随机），做完自动换一批，不固定。" },
     { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" }
   ];
@@ -3622,4 +3664,158 @@ function showCloudAccount() {
     close();
     render();
   };
+}
+/* ==================== 拼句打字 ====================
+   玩法（参考句乐部）：显示中文句子 → 逐词敲出英文 →
+   拼对的词变成带成分标签/音标/释义的彩色卡片 → 整句拼完 Perfect + ⭐。
+   句库来自 js/sentences.js（make_sentences.py 用 AI 生成）。 */
+var stList = [];     // 本轮句子队列
+var stIdx = 0;       // 当前第几句
+var stDone = [];     // 本句已拼对的卡片下标
+var stCombo = 0;     // 当前连对（跨句累计，出错清零）
+var stPerfect = 0;   // 本轮 Perfect 次数
+var stRoundScore = 0;// 本轮得分
+var stFinished = false;  // 当前句是否拼完
+var stErrThis = 0;   // 本句错误次数
+
+function stRoleClass(role) {
+  return { "主语": "st-subj", "谓语": "st-pred", "宾语": "st-obj",
+           "定语": "st-attr", "状语": "st-adv", "补语": "st-comp" }[role] || "st-other";
+}
+
+function startSentRound() {
+  if (typeof SENTENCES === "undefined" || !SENTENCES.length) {
+    alert("句库还没加载出来，请刷新页面重试"); return;
+  }
+  stList = SENTENCES.slice().sort(() => Math.random() - .5).slice(0, 8);
+  stIdx = 0; stCombo = 0; stPerfect = 0; stRoundScore = 0;
+  stDone = []; stFinished = false; stErrThis = 0;
+  render();
+}
+
+function sentNext() {
+  if (!stList.length) return;
+  if (stIdx >= stList.length - 1) { stIdx = stList.length; render(); return; }  // 本轮结束
+  stIdx++;
+  stDone = []; stFinished = false; stErrThis = 0;
+  render();
+}
+
+/* 实时输入：前缀对 → 正常；不对 → 红色提示（不重渲染，避免失焦） */
+function onSentType(inp) {
+  const cur = stList[stIdx] && stList[stIdx].words[stDone.length];
+  if (!cur) return;
+  const v = inp.value.trimStart();
+  const ok = cur.w.toLowerCase().startsWith(v.toLowerCase());
+  inp.classList.toggle("st-bad", v.length > 0 && !ok);
+  inp.classList.toggle("st-good", ok && v.length > 0);
+}
+
+/* 回车提交当前词卡 */
+function submitSentWord(inp) {
+  if (!stList.length || stFinished) return;
+  const s = stList[stIdx];
+  const cur = s.words[stDone.length];
+  if (!cur) return;
+  const v = (inp.value || "").trim();
+  if (!v) return;
+  if (v.toLowerCase() === cur.w.toLowerCase()) {
+    stDone.push(stDone.length);
+    stCombo++;
+    stRoundScore += 10 + Math.min(stCombo, 10) * 2;
+    if (stDone.length >= s.words.length) {
+      // 整句拼完：Perfect（零失误额外加分）+ ⭐ + 记录
+      stFinished = true;
+      if (stErrThis === 0) { stPerfect++; stRoundScore += 50; }
+      S.stars++;
+      try {
+        if (!Array.isArray(S.sentDone)) S.sentDone = [];
+        if (S.sentDone.indexOf(s.id) < 0) S.sentDone.push(s.id);
+      } catch (e) {}
+      save();
+    }
+    render();
+  } else {
+    stCombo = 0; stErrThis++;
+    inp.classList.remove("st-good");
+    inp.classList.add("st-shake");
+    setTimeout(() => inp && inp.classList && inp.classList.remove("st-shake"), 450);
+    inp.value = ""; onSentType(inp);
+  }
+}
+
+function viewSent() {
+  if (!stList.length) {
+    const doneCnt = Array.isArray(S.sentDone) ? S.sentDone.length : 0;
+    const total = typeof SENTENCES !== "undefined" ? SENTENCES.length : 0;
+    return `
+    <div class="card sent-intro">
+      <h3>🧩 拼句打字</h3>
+      <p>看<b>中文句子</b>，把英文<b>一个词一个词敲出来</b>。每敲对一个词，它就变成一张彩色卡片，
+      上面标着这个词的<b>句子成分</b>（主语/谓语/宾语…）、<b>音标</b>和<b>意思</b> ——
+      一句话拼完，语法结构自然就看懂了。</p>
+      <p class="muted">连着不出错会有 <b>Perfect</b> 加成；整句拼完 +1 ⭐。已解锁 ${doneCnt}/${total} 句。</p>
+      <button class="btn primary" data-act="stStart">开始本轮（8 句）→</button>
+    </div>`;
+  }
+  if (stIdx >= stList.length) {
+    return `
+    <div class="card sent-intro sent-done-card">
+      <h3>🎉 本轮完成！</h3>
+      <p class="st-big-score">${stRoundScore} <span>分</span></p>
+      <p>Perfect ×${stPerfect} · 一共 +${stList.length} ⭐</p>
+      <button class="btn primary" data-act="stStart">再来一轮 →</button>
+    </div>`;
+  }
+
+  const s = stList[stIdx];
+  const words = s.words;
+  const cur = words[stDone.length];
+  const pct = ((stIdx + (stFinished ? 1 : 0)) / stList.length) * 100;
+
+  // 已拼好的卡片流
+  const chipsHtml = words.map((w, i) => {
+    if (i < stDone.length || stFinished) {
+      return `<span class="st-chip ${stRoleClass(w.role)}">
+        <b class="st-role">${w.role}</b>
+        <i class="st-ipa">${w.ipa || ""}</i>
+        <span class="st-w">${esc(w.w)}</span>
+        <span class="st-wcn">${esc(w.cn)}</span>
+      </span>`;
+    }
+    if (i === stDone.length && !stFinished) {
+      return `<span class="st-chip st-cur">
+        <b class="st-role">${w.role}</b>
+        <i class="st-ipa st-hidden-ipa">?/?</i>
+        <input id="stInput" class="st-input" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="输入英文" data-act="stinput">
+        <span class="st-wcn">${esc(w.cn)}</span>
+      </span>`;
+    }
+    return "";
+  }).join("");
+
+  return `
+  <div class="st-head">
+    <div class="bar st-bar"><i style="width:${pct}%"></i></div>
+    <span class="st-count">第 ${stIdx + 1}/${stList.length} 句</span>
+    <span class="st-score">⭐ ${stRoundScore}</span>
+  </div>
+
+  <div class="card st-stage">
+    <div class="st-combo">${stCombo >= 2 ? `🔥 连对 ×${stCombo}` : "&nbsp;"}</div>
+    <div class="st-chips ${stFinished ? "st-all-done" : ""}">${chipsHtml}</div>
+    ${stFinished ? `
+      <div class="st-perfect">${stErrThis === 0 ? (stCombo >= 3 ? `Perfect ×${stCombo}` : "Perfect!") : "拼完啦！"}</div>
+      <p class="st-cn-final">${esc(s.cn)}</p>
+      <div class="ctrls">
+        <button class="btn primary" data-act="stNext">${stIdx >= stList.length - 1 ? "看本轮结果 →" : "下一句 →"}</button>
+        <button class="btn" data-act="stAgain">↻ 再拼一次</button>
+        <button class="btn" data-act="stSay">🔊 听发音</button>
+      </div>
+    ` : `
+      <p class="st-cn">📝 ${esc(s.cn)}</p>
+      <p class="muted st-hint">在输入框敲当前词，<kbd>Enter</kbd> 确认 · <kbd>Ctrl</kbd>+<kbd>1</kbd> 听整句 · <kbd>Ctrl</kbd>+<kbd>;</kbd> 重打</p>
+    `}
+  </div>`;
 }
