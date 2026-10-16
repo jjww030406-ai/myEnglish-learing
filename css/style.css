@@ -1630,3 +1630,97 @@ footer::before { content: "🌱 "; }
   }
 }
 .home-stats .hs-text .muted { white-space: nowrap; font-size: 12px; }
+
+/* =====================================================================
+   拼句打字（参考句乐部玩法）：彩色成分卡 + 居中拼装台
+   ===================================================================== */
+.sent-intro h3 { margin-bottom: 8px; }
+.sent-intro .btn { margin-top: 10px; }
+.sent-done-card { text-align: center; }
+.st-big-score { font-size: 44px; font-weight: 900; color: var(--brand); margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+.st-big-score span { font-size: 16px; color: var(--muted); font-weight: 600; }
+
+/* 顶部：进度 + 计数 + 得分 */
+.st-head { display: flex; align-items: center; gap: 14px; margin: 4px 0 14px; }
+.st-bar { flex: 1; margin: 0; }
+.st-count { font-size: 13.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.st-score { font-size: 16px; font-weight: 900; color: var(--warn); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 拼装台 */
+.st-stage { min-height: 320px; text-align: center; padding: 26px 22px; }
+.st-combo { min-height: 22px; font-size: 14px; font-weight: 800; color: var(--bad); }
+.st-chips { display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 10px; margin: 14px 0 6px; min-height: 120px; }
+.st-all-done .st-chip { animation: stPop .35s cubic-bezier(.34,1.56,.64,1) backwards; }
+.st-all-done .st-chip:nth-child(2) { animation-delay: .06s; }
+.st-all-done .st-chip:nth-child(3) { animation-delay: .12s; }
+.st-all-done .st-chip:nth-child(4) { animation-delay: .18s; }
+.st-all-done .st-chip:nth-child(5) { animation-delay: .24s; }
+.st-all-done .st-chip:nth-child(6) { animation-delay: .30s; }
+.st-all-done .st-chip:nth-child(7) { animation-delay: .36s; }
+.st-all-done .st-chip:nth-child(8) { animation-delay: .42s; }
+.st-all-done .st-chip:nth-child(9) { animation-delay: .48s; }
+@keyframes stPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* 词卡：成分徽章 + 音标 + 单词 + 释义（竖排小卡，像句乐部） */
+.st-chip {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 14px;
+  padding: 18px 14px 10px; min-width: 64px; position: relative;
+  box-shadow: var(--shadow-sm);
+}
+.st-role {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 800; color: #fff; white-space: nowrap;
+  padding: 1px 8px; border-radius: 999px; letter-spacing: .5px;
+}
+.st-ipa { font-style: normal; font-size: 11px; color: var(--muted); font-family: "Times New Roman", serif; min-height: 14px; }
+.st-w { font-size: 26px; font-weight: 800; line-height: 1.25; letter-spacing: .3px; }
+.st-wcn { font-size: 12px; color: var(--muted); border-top: 2px solid currentColor; padding-top: 3px; margin-top: 2px; }
+/* 成分配色（句乐部同款思路）：主语橙 / 谓语玫红 / 宾语蓝 / 定语紫 / 状语绿 / 补语青 */
+.st-subj .st-role { background: #f76707; } .st-subj { border-color: #ffd8b3; } .st-subj .st-w { color: #e8590c; }
+.st-pred .st-role { background: #d6336c; } .st-pred { border-color: #ffc9dd; } .st-pred .st-w { color: #c2255c; }
+.st-obj  .st-role { background: #1c7ed6; } .st-obj  { border-color: #c5e2ff; } .st-obj  .st-w { color: #1864ab; }
+.st-attr .st-role { background: #7048e8; } .st-attr { border-color: #dcd0ff; } .st-attr .st-w { color: #5f3dc4; }
+.st-adv  .st-role { background: #2f9e44; } .st-adv  { border-color: #c3f0cd; } .st-adv  .st-w { color: #2b8a3e; }
+.st-comp .st-role { background: #0ea5b5; } .st-comp { border-color: #bdeef3; } .st-comp .st-w { color: #0c8599; }
+.st-other .st-role { background: #868e96; }
+
+/* 当前输入卡 */
+.st-cur { border-color: var(--brand); border-style: dashed; background: #f8faff; box-shadow: 0 0 0 4px rgba(59,109,255,.08); }
+.st-hidden-ipa { opacity: .4; }
+.st-input {
+  width: 110px; text-align: center; font: inherit; font-size: 26px; font-weight: 800;
+  color: var(--brand-d); background: transparent; border: none; border-bottom: 3px solid var(--brand);
+  padding: 0 2px 2px; outline: none; border-radius: 0; caret-color: var(--brand);
+}
+.st-input::placeholder { color: #b9c6de; font-size: 14px; font-weight: 600; }
+.st-input.st-good { border-bottom-color: var(--ok); color: var(--ok); }
+.st-input.st-bad { border-bottom-color: var(--bad); color: var(--bad); }
+.st-input.st-shake { animation: stShake .4s; }
+@keyframes stShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); } 40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); } 80% { transform: translateX(5px); }
+}
+
+/* 中文句子 + Perfect */
+.st-cn { font-size: 22px; font-weight: 700; color: var(--txt); margin-top: 14px; }
+.st-cn-final { font-size: 20px; font-weight: 700; color: var(--muted); }
+.st-perfect {
+  font-size: 30px; font-weight: 900; font-style: italic; letter-spacing: 1px;
+  background: linear-gradient(90deg, #f76707, #d6336c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  margin: 12px 0 2px; animation: stPop .4s cubic-bezier(.34,1.56,.64,1);
+}
+.st-hint { margin-top: 10px; }
+.st-hint kbd {
+  background: var(--soft); border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 6px; font-size: 11.5px; font-family: inherit;
+}
+@media (max-width: 560px) {
+  .st-stage { padding: 22px 12px; }
+  .st-w { font-size: 21px; }
+  .st-input { width: 90px; font-size: 21px; }
+  .st-cn { font-size: 18px; }
+  .st-chip { padding: 14px 10px 8px; }
+}
