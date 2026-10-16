@@ -2371,6 +2371,21 @@ function togglePhrase(i) {
 /* ---------- 口语语音识别（听用户读，对比找错） ----------
    用浏览器自带 Web Speech API（Chrome / Edge 支持）。不支持的浏览器自动隐藏麦克风按钮。 */
 var srIdx = -1, srHeard = "", srActive = false, srCompare = null;
+var srRecording = false, srCloudUp = false, srMediaRec = null, srStream = null, srRecTimer = null;
+/* 免费云端语音转文字（无需 key，CORS 开放）：录音上传 → 返回文字。
+   用于 iOS / 微信等不支持 Web Speech API 的环境兜底；限额较低，仅作兜底。 */
+var ASR_URL = "https://notetakers.vipresearch.ca/stt/v1/transcribe";
+function canRecord() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+function cloudTranscribe(blob, text, onDone) {
+  var fd = new FormData();
+  fd.append("file", blob, "rec.webm");
+  fd.append("engine", "whisper");
+  fd.append("language", "en");
+  fetch(ASR_URL, { method: "POST", body: fd })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { onDone(j && j.success && j.text ? j.text : null); })
+    .catch(function () { onDone(null); });
+}
 function hasSpeech() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
 function _esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 function _norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9'\s]/g, " ").replace(/\s+/g, " ").trim(); }
@@ -2384,20 +2399,58 @@ function comparePhrase(target, heard) {
 }
 function startSpeech(idx) { startSpeechText(PHRASES[idx] ? PHRASES[idx].en : "", idx); }
 function startSpeechText(text, idx) {
+  if (srRecording) { stopCloudRec(); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { speechBlockedGuide(); return; }
-  if (srActive) return;
-  srActive = true; srIdx = idx; srHeard = ""; srCompare = null; render();
-  let rec;
-  try { rec = new SR(); } catch (e) { srActive = false; speechBlockedGuide(); render(); return; }
-  rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
-  rec.onresult = e => {
-    try { srHeard = e.results[0][0].transcript; } catch (_) { srHeard = ""; }
-    srCompare = comparePhrase(text, srHeard);
-  };
-  rec.onerror = e => { srHeard = "（没听清：" + (e && e.error ? e.error : "请再试一次") + "）"; };
-  rec.onend = () => { srActive = false; render(); };
-  try { rec.start(); } catch (e) { srActive = false; render(); }
+  if (SR) {
+    if (srActive) return;
+    srActive = true; srIdx = idx; srHeard = ""; srCompare = null; srRecording = false; srCloudUp = false; render();
+    let rec;
+    try { rec = new SR(); } catch (e) { srActive = false; return cloudFallback(text, idx); }
+    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+    rec.onresult = e => {
+      try { srHeard = e.results[0][0].transcript; } catch (_) { srHeard = ""; }
+      srCompare = comparePhrase(text, srHeard);
+    };
+    rec.onerror = e => {
+      const err = e && e.error ? e.error : "";
+      if (err === "not-allowed" || err === "service-not-allowed") { srActive = false; return cloudFallback(text, idx); }
+      srHeard = "（没听清：" + err + "）";
+    };
+    rec.onend = () => { srActive = false; render(); };
+    try { rec.start(); } catch (e) { srActive = false; cloudFallback(text, idx); }
+    return;
+  }
+  cloudFallback(text, idx);
+}
+function cloudFallback(text, idx) {
+  if (canRecord()) startCloudRec(text, function (tr) {
+    srIdx = idx; srHeard = tr || "（没听清，请再试一次）"; srCompare = comparePhrase(text, srHeard);
+    srRecording = false; srCloudUp = false; render();
+  });
+  else speechBlockedGuide();
+}
+function stopCloudRec() {
+  if (srRecTimer) { clearTimeout(srRecTimer); srRecTimer = null; }
+  if (srMediaRec && srMediaRec.state !== "inactive") { try { srMediaRec.stop(); } catch (_) {} }
+}
+function startCloudRec(text, onDone) {
+  if (!canRecord()) { speechBlockedGuide(); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+    srStream = stream;
+    let rec;
+    try { rec = new MediaRecorder(stream); } catch (e) { stream.getTracks().forEach(t => t.stop()); speechBlockedGuide(); return; }
+    srMediaRec = rec;
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      srRecording = false; srCloudUp = true; render();
+      if (srStream) srStream.getTracks().forEach(t => t.stop());
+      cloudTranscribe(new Blob(chunks, { type: rec.mimeType || "audio/webm" }), text, onDone);
+    };
+    rec.start();
+    srRecording = true; srCloudUp = false; render();
+    srRecTimer = setTimeout(function () { if (srMediaRec && srMediaRec.state !== "inactive") srMediaRec.stop(); }, 9000);
+  }).catch(function () { srRecording = false; srCloudUp = false; speechBlockedGuide(); render(); });
 }
 function speechBlockedGuide() {
   const ua = navigator.userAgent;
@@ -2412,8 +2465,8 @@ function speechBlockedGuide() {
     reason = "当前还是 http:// 不安全链接";
     fix = "浏览器在 http 下会禁用语音识别。等地址变成 https://（证书正在签发中）后，语音功能会自动出现。";
   } else if (isIOS) {
-    reason = "苹果手机的系统浏览器（iOS Safari）不支持实时语音识别";
-    fix = "请用安卓手机，或用电脑上的 Chrome / Edge 打开本网站。";
+    reason = "苹果手机在 http:// 下无法用语音（系统要求安全链接 https）";
+    fix = "等地址变成 https://jjww.new.tg 后，用 iPhone 自带 Safari 打开就能直接说；若从微信打开，点右上角「⋯ → 在浏览器打开」也能用录音识别。";
   } else {
     reason = "当前浏览器不支持语音识别";
     fix = "请用 Chrome / Edge（电脑或安卓手机）打开本网站。";
@@ -2422,7 +2475,7 @@ function speechBlockedGuide() {
     '<h3>🎤 语音功能暂时用不了</h3>' +
     '<p>' + reason + '。</p>' +
     '<p class="muted">' + fix + '</p>' +
-    '<p class="muted">👉 想用「说给我听 / 跟读评测」，建议：用手机<b>自带浏览器</b>（别用微信）打开 <b>https://jjww.new.tg</b>（安卓手机），或用电脑 Chrome。等 https 生效后安卓手机直接就能用。</p>' +
+    '<p class="muted">👉 iOS / 微信里用语音：先把链接升级成 <b>https://jjww.new.tg</b>（证书正在处理），然后用 iPhone 自带 Safari 打开，或微信里点「⋯ → 在浏览器打开」。安卓手机用自带 Chrome 打开 https 链接也能直接用。</p>' +
     '<button class="modal-btn" onclick="var m=document.getElementById(\'sgMask\');if(m)m.remove()">知道了</button>' +
     '</div></div>';
   const old = document.getElementById("sgMask"); if (old) old.remove();
@@ -2454,9 +2507,9 @@ function viewPhrases() {
           <span class="pt-ipa">${p.ph || ""}</span>
           <span class="pt-cn">${p.cn}</span>
           <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊</button>
-          <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说</button>
+          <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">${srRecording && srIdx === i ? "🎤 停止" : "🎤 说"}</button>
           <button class="mini" data-phrase="${i}">我会了</button>
-          ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听…</div>` : ""}
+          ${srIdx === i && (srActive ? `<div class="ph-listening">🎤 正在听…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "")}
           ${srIdx === i && srCompare ? phraseCmpHtml(p, i) : ""}
         </div>`;
       }).join("")}
@@ -2491,9 +2544,9 @@ function viewPhrases() {
         ${p.tip ? `<div class="ph-tip">💡 ${p.tip}</div>` : ""}
       </div>
       <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊 朗读</button>
-      <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说给我听</button>
+      <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">${srRecording && srIdx === i ? "🎤 停止" : "🎤 说给我听"}</button>
       <button class="mini ${phraseDone(i) ? "ph-done" : ""}" data-phrase="${i}">${phraseDone(i) ? "✅ 已会" : "我会了"}</button>
-      ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : ""}
+      ${srIdx === i && (srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "")}
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
     </div>`).join("")}
   </div>
@@ -2855,13 +2908,13 @@ function viewRead() {
         <button class="chip ${readMode === "fill" ? "on" : ""}" data-readmode="fill">填单词</button>
       </span>
       <button class="mini" onclick="speak('${String(art.en).replace(/'/g, "\\'")}')">🔊 朗读</button>
-      <button class="mini" data-act="rdspeak" title="点我，然后大声朗读整段，我来听你读得对不对">🎤 跟读</button>
+      <button class="mini" data-act="rdspeak" title="点我，然后大声朗读整段，我来听你读得对不对">${rdSr.recording ? "🎤 停止" : "🎤 跟读"}</button>
     </div>
     ${readMode === "trans"
       ? `<button class="mini rd-allcn" data-act="rdallcn">${readShowCn ? "隐藏全部中文" : "显示全部中文"}</button>`
       : ""}
     ${body}
-    ${rdSr.active ? `<div class="ph-listening">🎤 正在听你朗读…</div>` : ""}
+    ${rdSr.active ? `<div class="ph-listening">🎤 正在听你朗读…</div>` : rdSr.recording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : rdSr.uploading ? `<div class="ph-listening">☁️ 上传识别中…</div>` : ""}
     ${readCmpHtml()}
   </div>
   <div class="card">
@@ -2906,23 +2959,61 @@ function checkReadFill() {
 /* ---------- 阅读·语音跟读（听用户读整段，逐词标对错） ----------
    复用口语页的 comparePhrase：把用户读到的词和原文逐词比对。
    全对给表扬；有错则把读错的词列出来，每个都能 🔊 听正确读法 + 看音标。 */
-var rdSr = { active: false, heard: "", cmp: null };
+var rdSr = { active: false, heard: "", cmp: null, recording: false, uploading: false, stream: null, rec: null, timer: null };
 function startReadSpeech() {
+  if (rdSr.recording) { stopReadCloud(); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { speechBlockedGuide(); return; }
-  if (rdSr.active) return;
-  rdSr.active = true; rdSr.heard = ""; rdSr.cmp = null; render();
-  let rec;
-  try { rec = new SR(); } catch (e) { rdSr.active = false; render(); return; }
-  rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
-  rec.onresult = e => {
-    try { rdSr.heard = e.results[0][0].transcript; } catch (_) { rdSr.heard = ""; }
-    const art = READING[readId];
-    rdSr.cmp = art ? comparePhrase(art.en, rdSr.heard) : null;
-  };
-  rec.onerror = e => { rdSr.heard = "（没听清：" + (e && e.error ? e.error : "请再试一次") + "）"; };
-  rec.onend = () => { rdSr.active = false; render(); };
-  try { rec.start(); } catch (e) { rdSr.active = false; render(); }
+  const text = READING[readId] ? READING[readId].en : "";
+  if (SR) {
+    if (rdSr.active) return;
+    rdSr.active = true; rdSr.heard = ""; rdSr.cmp = null; rdSr.recording = false; rdSr.uploading = false; render();
+    let rec;
+    try { rec = new SR(); } catch (e) { rdSr.active = false; return readCloudFallback(text); }
+    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+    rec.onresult = e => {
+      try { rdSr.heard = e.results[0][0].transcript; } catch (_) { rdSr.heard = ""; }
+      rdSr.cmp = text ? comparePhrase(text, rdSr.heard) : null;
+    };
+    rec.onerror = e => {
+      const err = e && e.error ? e.error : "";
+      if (err === "not-allowed" || err === "service-not-allowed") { rdSr.active = false; return readCloudFallback(text); }
+      rdSr.heard = "（没听清：" + err + "）";
+    };
+    rec.onend = () => { rdSr.active = false; render(); };
+    try { rec.start(); } catch (e) { rdSr.active = false; readCloudFallback(text); }
+    return;
+  }
+  readCloudFallback(text);
+}
+function readCloudFallback(text) {
+  if (canRecord()) startReadCloud(text); else speechBlockedGuide();
+}
+function startReadCloud(text) {
+  if (!canRecord()) { speechBlockedGuide(); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+    rdSr.stream = stream;
+    let rec;
+    try { rec = new MediaRecorder(stream); } catch (e) { stream.getTracks().forEach(t => t.stop()); speechBlockedGuide(); return; }
+    rdSr.rec = rec;
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      rdSr.recording = false; rdSr.uploading = true; render();
+      stream.getTracks().forEach(t => t.stop());
+      cloudTranscribe(new Blob(chunks, { type: rec.mimeType || "audio/webm" }), text, function (tr) {
+        rdSr.heard = tr || "（没听清，请再试一次）";
+        rdSr.cmp = text ? comparePhrase(text, rdSr.heard) : null;
+        rdSr.uploading = false; render();
+      });
+    };
+    rec.start();
+    rdSr.recording = true; rdSr.uploading = false; render();
+    rdSr.timer = setTimeout(function () { if (rec.state !== "inactive") rec.stop(); }, 12000);
+  }).catch(function () { rdSr.recording = false; rdSr.uploading = false; speechBlockedGuide(); render(); });
+}
+function stopReadCloud() {
+  if (rdSr.timer) { clearTimeout(rdSr.timer); rdSr.timer = null; }
+  if (rdSr.rec && rdSr.rec.state !== "inactive") { try { rdSr.rec.stop(); } catch (_) {} }
 }
 function readCmpHtml() {
   if (!rdSr.cmp) return "";
