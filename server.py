@@ -39,6 +39,9 @@ ALLOW_ORIGIN = os.environ.get("ALLOW_ORIGIN", "*")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_API_KEY = os.environ.get("AI_API_KEY", "")
 AI_MODEL = os.environ.get("AI_MODEL", "gpt-4o-mini")
+# 免费兜底端点（免 key、免注册）：优先使用；失败自动回退到上面用户配置的 key
+FREE_AI_BASE_URL = "https://blockrun.ai/api/v1"
+FREE_AI_MODEL = "nvidia/nemotron-3.5-lightning"
 
 UA = {"User-Agent": "Mozilla/5.0 (compatible; EnglishSiteBot/1.0)"}
 TAG_RE = re.compile(r"<(script|style|head|meta)[^>]*>.*?</\1>", re.S | re.I)
@@ -161,24 +164,37 @@ def enrich_word(word):
 
 
 # ---------------- AI ----------------
-def ai_chat(messages, system=None):
-    """转发到 OpenAI 兼容端点，返回 (文本, 错误)。"""
-    if not AI_API_KEY:
-        return None, "AI_API_KEY 未配置（在服务端 export 你的 key）"
-    msgs = ([{"role": "system", "content": system}] if system else []) + list(messages)
-    payload = {"model": AI_MODEL, "messages": msgs, "stream": False}
+def _one_ai_call(base_url, model, api_key, msgs, timeout=45):
+    payload = {"model": model, "messages": msgs, "stream": False}
     req = urllib.request.Request(
-        AI_BASE_URL + "/chat/completions",
+        base_url + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + AI_API_KEY},
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + api_key},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=45) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read().decode("utf-8"))
         return data["choices"][0]["message"]["content"], None
     except Exception as e:
         return None, str(e)
+
+
+def ai_chat(messages, system=None):
+    """AI 推理：免费端点优先；若用户配了 AI_API_KEY，免费失败自动回退到你的 key。
+    返回 (文本, 错误)。"""
+    msgs = ([{"role": "system", "content": system}] if system else []) + list(messages)
+    # 免费优先；设了 key 再作为兜底
+    plan = [("免费端点", FREE_AI_BASE_URL, FREE_AI_MODEL, "not-needed", 25)]
+    if AI_API_KEY:
+        plan.append(("你的Key(" + AI_MODEL + ")", AI_BASE_URL, AI_MODEL, AI_API_KEY, 45))
+    last_err = "无可用端点"
+    for name, base, model, key, timeout in plan:
+        text, err = _one_ai_call(base, model, key, msgs, timeout)
+        if text:
+            return text, None
+        last_err = name + " 失败: " + err
+    return None, last_err
 
 
 def extract_json(text):
@@ -294,5 +310,5 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Python 后端已启动 → http://localhost:{PORT}")
     print(f"  ALLOW_ORIGIN = {ALLOW_ORIGIN}")
-    print(f"  AI 已配置     = {'是 ('+AI_MODEL+')' if AI_API_KEY else '否（设 AI_API_KEY 后启用 /api/ai、/api/enrich）'}")
+    print(f"  AI 模式      = 免费端点优先" + ("，失败回退你的Key(" + AI_MODEL + ")" if AI_API_KEY else "（未配 AI_API_KEY，只用免费端点）"))
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
