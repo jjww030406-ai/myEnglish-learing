@@ -65,6 +65,21 @@
     for (var k = 0; k < n; k++) out.push(list[(start + k) % list.length]);
     return out;
   }
+  /* 限并发执行：同一时刻最多 limit 个异步任务在跑，避免一次性打爆免费 API */
+  async function mapLimit(arr, limit, fn) {
+    var i = 0, out = new Array(arr.length);
+    async function worker() {
+      while (i < arr.length) {
+        var idx = i++;
+        if (idx >= arr.length) break;
+        out[idx] = await fn(arr[idx], idx);
+      }
+    }
+    var ws = [], n = Math.min(limit, arr.length);
+    for (var c = 0; c < n; c++) ws.push(worker());
+    await Promise.all(ws);
+    return out;
+  }
   function extractJSON(str) {
     if (!str) return {};
     var s = String(str).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -274,7 +289,7 @@
     var queue = (typeof WORD_FREQ !== "undefined" && WORD_FREQ.length) ? WORD_FREQ
               : (typeof WORD_LIST !== "undefined" ? WORD_LIST : []);
 
-    var picked = pickDaily(queue, 12, dateStr);
+    var picked = pickDaily(queue, 30, dateStr);
     var need = picked.filter(function (w) { return !have[w] && !STOP[w] && /^[a-z]{2,12}$/.test(w); });
 
     if (!need.length) {
@@ -287,18 +302,21 @@
     safeRender();
 
     var fresh = [];
-    for (var i = 0; i < need.length; i++) {
-      var w = need[i];
-      var dict = await fetchDict(w);
-      var extra = (seed[w]) || null;
-      if (!extra) { var cn = await fetchCn(w); if (cn) extra = { cn: cn }; }   // 翻译 API：中文零依赖兜底
-      if (!extra && cloud) { var g = await genCn(dict || { w: w }); if (g) extra = g; }
-      if (!dict && !extra) continue;            // 连词典都查不到，跳过这个词
-      var entry = assemble(w, dict, extra || {});
-      fresh.push(entry);
-      window.DAILY_INFO = { status: "loading", text: "🌐 正在补充新词… (" + (i + 1) + "/" + need.length + ")" };
-      safeRender();
-    }
+    var done = 0;
+    var results = await mapLimit(need, 4, function (w) {
+      return (async function () {
+        var dict = await fetchDict(w);
+        var extra = (seed[w]) || null;
+        if (!extra) { var cn = await fetchCn(w); if (cn) extra = { cn: cn }; }   // 翻译 API：中文零依赖兜底
+        if (!extra && cloud) { var g = await genCn(dict || { w: w }); if (g) extra = g; }
+        if (!dict && !extra) return null;            // 连词典都查不到，跳过这个词
+        done++;
+        window.DAILY_INFO = { status: "loading", text: "🌐 正在补充新词… (" + done + "/" + need.length + ")" };
+        safeRender();
+        return assemble(w, dict, extra || {});
+      })();
+    });
+    for (var ri = 0; ri < results.length; ri++) { if (results[ri]) fresh.push(results[ri]); }
 
     if (fresh.length) {
       lib = lib.concat(fresh);
