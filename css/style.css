@@ -2514,3 +2514,22 @@ h2 { margin: 4px 0 14px; }
 
 /* Hero 文案放宽一点，避免大屏上文字只占左侧一小条 */
 .hero-inner { max-width: 780px; }
+
+/* ===== 口语页：按场景分组 + 地道标签 ===== */
+.ph-group { margin-bottom: 26px; }
+.ph-gtitle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 800; margin: 0 0 12px;
+  padding: 9px 14px; border-radius: 999px;
+  background: linear-gradient(135deg, #FFF1EE, #FFF6F0);
+  border: 1px solid rgba(244,121,107,.28); color: var(--coral-dark);
+}
+.ph-gtitle .muted { font-weight: 600; font-size: 12.5px; }
+/* 地道句：左侧珊瑚色条，一眼能区分「课文英语」和「真会说的英语」 */
+.card.phrase.is-native { border-left: 3px solid var(--coral); }
+.ph-nat-tag {
+  display: inline-block; margin-left: 8px; vertical-align: middle;
+  font-size: 11px; font-weight: 800; letter-spacing: .5px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--coral); color: #fff;
+}
