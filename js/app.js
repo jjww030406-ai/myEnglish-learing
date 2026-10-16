@@ -1396,28 +1396,6 @@ function todayPlan() {
     <div class="plan-goal">🏁 本阶段目标：<b>${tp.goal}</b>　·　${remaining > 0 ? `再掌握 <b>${remaining}</b> 个词进入下一阶段`
       : remaining === 0 ? "词数已经够了，做完本课测验就能进入下一阶段"
       : "已是最后阶段，把学过的词和句型自由组合着说"}</div>
-    <div class="today-words">
-      <div class="tw-head">今日达标清单 <span class="muted">（今天就盯这几个词，达标一个打一个勾；点一下看详解）</span></div>
-      <div class="tw-list">
-        ${focus.map(w => {
-          const mp = masteryProgress(w.w);
-          const badge = mp.ok
-            ? `<span class="tw-ok">✓ 已掌握</span>`
-            : `<span class="tw-need">连对 ${mp.streak}/${mp.need}</span>`;
-          return `
-          <button class="tw${mp.ok ? " done" : ""}" data-word="${w.w}">
-            <b>${w.w}</b><span class="tw-cn">${(w.cn || "").slice(0, 12)}</span>${badge}
-          </button>`;
-        }).join("")}
-      </div>
-      ${mi.all ? `<div class="tw-all">🎉 这一组已经全部熟练掌握（${mi.done}/${mi.total}）。<button class="btn tw-more" data-act="morewords">再来一组 →</button></div>` : ""}
-    </div>
-    <div class="mastery-rule">
-      <b>怎样才算「熟练掌握」？</b>
-      <span>今天练过　·　<b>连续拼对 3 次</b>　·　全程没点提示 / 没看答案　·　不在错题本里。</span>
-      <span class="muted">只看「练过几个」不算数 —— 抄一遍答案也能凑数，这里卡的是连对次数；中途点了提示或拼错一次就清零重来。</span>
-      <span class="mr-now">今天已熟练掌握 <b>${mi.done}</b> / ${mi.total} 个</span>
-    </div>
     <div class="plan-list">
       ${items.map(it => `
         <div class="plan-item ${it.p}">
@@ -1492,24 +1470,12 @@ function viewToday() {
       </div>
     </div>`;
 
-  // ② 今日单词：达标清单，逐词标出「已掌握 / 连对几次 / 还没练」
-  const wordBlock = `
-    <div class="card">
-      <h3>📝 今日单词 <span class="muted">（${mi.done}/${mi.total} 已掌握 · 连对 3 次算掌握）</span></h3>
-      <div class="td-list">
-        ${mi.list.map(w => {
-          const mp = masteryProgress(w.w);
-          return `<div class="td-row${mp.ok ? " done" : ""}">
-            <span class="td-ico">${mp.ok ? "✅" : "⬜"}</span>
-            <div class="td-main"><b>${w.w}</b><span class="td-cn">${(w.cn || "").slice(0, 12)}</span></div>
-            <span class="td-st ${mp.ok ? "ok" : "need"}">${mp.ok ? "已掌握" : (mp.seen ? `连对 ${mp.streak}/3` : "还没练")}</span>
-            <button class="mini" data-word="${w.w}">看详解</button>
-          </div>`;
-        }).join("")}
-      </div>
-      <button class="btn td-go" data-v="spell">去拼写练习 →</button>
-      ${mi.all ? `<div class="tw-all">🎉 这一组全部熟练掌握（${mi.done}/${mi.total}）。<button class="btn tw-more" data-act="morewords">再来一组 →</button></div>` : ""}
-    </div>`;
+  // ② 今日单词达标清单：已移除。
+  //    理由：它和「🔁 每日复习」是同一件事（都是给你一批词去练），首页那块已经去掉了，
+  //    这里留着只是换个页面重复一遍，反而让用户不知道该看哪个。
+  //    想复习词直接去「每日复习」；今天的完成进度在上方概览里仍看得见。
+  const wordBlock = "";
+
 
   // ③ 今日口语：今天该练的几句，点了「我会了」就打勾
   const phBlock = phTodo.length ? `
@@ -1563,7 +1529,7 @@ function viewToday() {
     </div>`;
 
   // 页面头由 render() 统一插入，这里只返回正文（早期这里重复插了一次，导致标题出现两遍）
-  return over + wordBlock + phBlock + gBlock + detail;
+  return over + phBlock + gBlock + detail;
 }
 
 /* 单个「今日单词」卡片：词 + 中文 + 词性/其他用法/复数/可数性 + 例句 */
