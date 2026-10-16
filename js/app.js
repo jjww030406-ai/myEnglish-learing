@@ -1762,7 +1762,9 @@ function viewSpell() {
   } else {
     prompt = `<div class="sp-ph">${w.ph}</div>
       <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>
-      <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 听例句</button>`;
+      <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 听例句</button>
+      <button class="mini" onclick="startSpeechText('${w.s.replace(/'/g, "\\'")}', 'sp')">🎤 跟读</button>
+      ${srIdx === "sp" && srCompare ? phraseCmpHtml() : ""}`;
   }
   // 听写模式零基础最需要：句子的中文 + 每个词的意思
   if (spMode === "dict") prompt += sentenceHelp(w);
@@ -2380,21 +2382,51 @@ function comparePhrase(target, heard) {
   const allOk = words.every(x => x.ok) && Math.abs(t.length - h.length) <= 1;
   return { words, allOk, heard };
 }
-function startSpeech(idx) {
+function startSpeech(idx) { startSpeechText(PHRASES[idx] ? PHRASES[idx].en : "", idx); }
+function startSpeechText(text, idx) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert("当前浏览器不支持语音识别，请用 Chrome / Edge 打开本网站。"); return; }
+  if (!SR) { speechBlockedGuide(); return; }
   if (srActive) return;
   srActive = true; srIdx = idx; srHeard = ""; srCompare = null; render();
   let rec;
-  try { rec = new SR(); } catch (e) { srActive = false; render(); return; }
+  try { rec = new SR(); } catch (e) { srActive = false; speechBlockedGuide(); render(); return; }
   rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
   rec.onresult = e => {
     try { srHeard = e.results[0][0].transcript; } catch (_) { srHeard = ""; }
-    srCompare = comparePhrase(PHRASES[idx].en, srHeard);
+    srCompare = comparePhrase(text, srHeard);
   };
   rec.onerror = e => { srHeard = "（没听清：" + (e && e.error ? e.error : "请再试一次") + "）"; };
   rec.onend = () => { srActive = false; render(); };
   try { rec.start(); } catch (e) { srActive = false; render(); }
+}
+function speechBlockedGuide() {
+  const ua = navigator.userAgent;
+  const isWX = /micromessenger/i.test(ua);
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const isHttps = location.protocol === "https:";
+  let reason, fix;
+  if (isWX) {
+    reason = "你是用微信内置浏览器打开的";
+    fix = "点微信右上角 ⋯ →「在浏览器打开」→ 用手机 Chrome / Edge 打开 https://jjww.new.tg。";
+  } else if (!isHttps) {
+    reason = "当前还是 http:// 不安全链接";
+    fix = "浏览器在 http 下会禁用语音识别。等地址变成 https://（证书正在签发中）后，语音功能会自动出现。";
+  } else if (isIOS) {
+    reason = "苹果手机的系统浏览器（iOS Safari）不支持实时语音识别";
+    fix = "请用安卓手机，或用电脑上的 Chrome / Edge 打开本网站。";
+  } else {
+    reason = "当前浏览器不支持语音识别";
+    fix = "请用 Chrome / Edge（电脑或安卓手机）打开本网站。";
+  }
+  const html = '<div class="modal-mask" id="sgMask"><div class="modal">' +
+    '<h3>🎤 语音功能暂时用不了</h3>' +
+    '<p>' + reason + '。</p>' +
+    '<p class="muted">' + fix + '</p>' +
+    '<p class="muted">👉 想用「说给我听 / 跟读评测」，建议：用手机<b>自带浏览器</b>（别用微信）打开 <b>https://jjww.new.tg</b>（安卓手机），或用电脑 Chrome。等 https 生效后安卓手机直接就能用。</p>' +
+    '<button class="modal-btn" onclick="var m=document.getElementById(\'sgMask\');if(m)m.remove()">知道了</button>' +
+    '</div></div>';
+  const old = document.getElementById("sgMask"); if (old) old.remove();
+  document.body.insertAdjacentHTML("beforeend", html);
 }
 function phraseCmpHtml() {
   if (!srCompare) return "";
@@ -2422,7 +2454,7 @@ function viewPhrases() {
           <span class="pt-ipa">${p.ph || ""}</span>
           <span class="pt-cn">${p.cn}</span>
           <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊</button>
-          ${hasSpeech() ? `<button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说</button>` : ""}
+          <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说</button>
           <button class="mini" data-phrase="${i}">我会了</button>
           ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听…</div>` : ""}
           ${srIdx === i && srCompare ? phraseCmpHtml(p, i) : ""}
@@ -2437,7 +2469,7 @@ function viewPhrases() {
   return `
   ${todayBlock}
   <h2>💬 日常口语 ${PHRASES.length} 句　<span class="ph-count">已会 ${phraseDoneCount()} / ${PHRASES.length}</span></h2>
-  <p class="muted">每句都标了<b>音标</b>，照着念就能读准。点 🔊 可以听发音，然后大声跟读三遍；<b>觉得自己会说这句了，就点「我会了」</b>，进度会记在「我的」里。${hasSpeech() ? ' 若在 <b>Chrome / Edge</b> 里打开，每句还有 🎤 说给我听：你读出来，我听对错并逐词标红。' : ''}</p>
+  <p class="muted">每句都标了<b>音标</b>，照着念就能读准。点 🔊 可以听发音，然后大声跟读三遍；<b>觉得自己会说这句了，就点「我会了」</b>，进度会记在「我的」里。 点每句的 🎤 说给我听：你读出这句，我逐词标红哪些读错了。手机上若点了没反应，会弹出提示告诉你怎么解决。</p>
   <div class="tipbox">
     <b>怎么练最有效</b>
     <ol class="tips">
@@ -2459,7 +2491,7 @@ function viewPhrases() {
         ${p.tip ? `<div class="ph-tip">💡 ${p.tip}</div>` : ""}
       </div>
       <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊 朗读</button>
-      ${hasSpeech() ? `<button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说给我听</button>` : ""}
+      <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">🎤 说给我听</button>
       <button class="mini ${phraseDone(i) ? "ph-done" : ""}" data-phrase="${i}">${phraseDone(i) ? "✅ 已会" : "我会了"}</button>
       ${srIdx === i && srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : ""}
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
@@ -2823,7 +2855,7 @@ function viewRead() {
         <button class="chip ${readMode === "fill" ? "on" : ""}" data-readmode="fill">填单词</button>
       </span>
       <button class="mini" onclick="speak('${String(art.en).replace(/'/g, "\\'")}')">🔊 朗读</button>
-      ${hasSpeech() ? `<button class="mini" data-act="rdspeak" title="点我，然后大声朗读整段，我来听你读得对不对">🎤 跟读</button>` : ""}
+      <button class="mini" data-act="rdspeak" title="点我，然后大声朗读整段，我来听你读得对不对">🎤 跟读</button>
     </div>
     ${readMode === "trans"
       ? `<button class="mini rd-allcn" data-act="rdallcn">${readShowCn ? "隐藏全部中文" : "显示全部中文"}</button>`
@@ -2877,7 +2909,7 @@ function checkReadFill() {
 var rdSr = { active: false, heard: "", cmp: null };
 function startReadSpeech() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert("当前浏览器不支持语音识别，请用 Chrome / Edge 打开本网站。"); return; }
+  if (!SR) { speechBlockedGuide(); return; }
   if (rdSr.active) return;
   rdSr.active = true; rdSr.heard = ""; rdSr.cmp = null; render();
   let rec;
