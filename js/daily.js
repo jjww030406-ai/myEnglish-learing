@@ -444,12 +444,57 @@
     return GRAMMAR;
   }
 
+  /* ---------------- 用法（PHRASALVERBS）动态装配：基础种子 + 云端共享 ---------------- */
+  var SHARED_PHRASALS_KEY = "__global_phrasals__";
+  async function sbLoadSharedPhrasals() {
+    if (!SYNC.enabled || !SYNC.url) return [];
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_PHRASALS_KEY + "&select=data", { headers: sbHeaders() });
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var arr = (rows && rows[0] && rows[0].data && rows[0].data.phrasals) || [];
+      return arr.map(function (x) { return { phrase: x.phrase, cn: x.cn || "", ex: x.ex || "", exCn: x.exCn || "", level: x.level || 1, note: x.note || "" }; });
+    } catch (e) { return []; }
+  }
+  async function sbUpsertPhrasals(arr) {
+    if (!SYNC.enabled || !SYNC.url || !arr.length) return;
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_PHRASALS_KEY + "&select=data", { headers: sbHeaders() });
+      var old = [];
+      if (r.ok) { var rows = await r.json(); old = (rows && rows[0] && rows[0].data && rows[0].data.phrasals) || []; }
+      var seen = {}, merged = [];
+      old.forEach(function (x) { if (x && x.phrase && !seen[x.phrase]) { seen[x.phrase] = 1; merged.push(x); } });
+      arr.forEach(function (x) { if (x && x.phrase && !seen[x.phrase]) { seen[x.phrase] = 1; merged.push(x); } });
+      await fetch(SYNC.url + "/rest/v1/learning_progress", {
+        method: "POST", headers: sbHeaders(),
+        body: JSON.stringify([{ profile_id: SHARED_PHRASALS_KEY, data: { phrasals: merged }, updated_at: new Date().toISOString() }])
+      });
+    } catch (e) {}
+  }
+  function applyPhrasals(shared) {
+    var seen = {}, out = [];
+    function add(p) { if (p && p.phrase && !seen[p.phrase]) { seen[p.phrase] = 1; out.push(p); } }
+    // 云端共享优先（运行时动态提供、可随时增删），本地种子仅作离线兜底
+    (shared || []).forEach(add);
+    (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 1; add(q); });
+    PHRASALVERBS = out;
+    return out;
+  }
+  async function loadDailyPhrasals() {
+    var shared = await sbLoadSharedPhrasals();
+    applyPhrasals(shared);
+    if (shared.length === 0 && (typeof PHRASALVERBS !== "undefined") && PHRASALVERBS.length) {
+      sbUpsertPhrasals(PHRASALVERBS.map(function (p) { return p; }));
+    }
+    return PHRASALVERBS;
+  }
+
   window.DailyEngine = {
     loadDailyWords: loadDailyWords, loadDailyPhrases: loadDailyPhrases,
-    loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar,
+    loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar, loadDailyPhrasals: loadDailyPhrasals,
     pickDaily: pickDaily, extractJSON: extractJSON,
     localDateStr: localDateStr, fetchDict: fetchDict, genCn: genCn,
-    applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar
+    applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar, applyPhrasals: applyPhrasals
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { pickDaily: pickDaily, extractJSON: extractJSON, localDateStr: localDateStr };
