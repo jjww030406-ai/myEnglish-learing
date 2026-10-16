@@ -176,7 +176,7 @@ function normalize(d) {
   const base = { learned: [], stars: 0, quizBest: 0, days: [], todayCount: 0,
                  todayWords: [], date: today(), wrongWords: [], wrongStats: {},
                  lastReview: "", reviewSeen: "", wordStats: {}, phraseDone: [],
-                 dayList: [], dayListDate: "", dayExtra: 0 };
+                 dayList: [], dayListDate: "", dayExtra: 0, practiceLog: [] };
   if (!d || typeof d !== "object") return base;
 
   const arr = v => Array.isArray(v) ? v : [];
@@ -227,7 +227,21 @@ function normalize(d) {
     };
   });
 
+  /* 练习流水：最近 N 次作答的明细（日期 / 词 / 对错 / 是否看了答案 / 模式）。
+     这是「自适应难度」判断你学得顺不顺的唯一依据 ——
+     只看累计掌握词数是不够的：有人练得多但一直错，难度就不该往上走。 */
+  const log = arr(d.practiceLog).filter(function (x) {
+    return x && typeof x === "object" && typeof x.w === "string";
+  }).map(function (x) {
+    return {
+      d: str(x.d, ""), w: x.w,
+      ok: x.ok === true, as: x.as === true,
+      m: str(x.m, "cn")
+    };
+  }).slice(-120);
+
   return {
+    practiceLog: log,
     learned:   learnedArr,
     stars:     num(d.stars, 0),
     quizBest:  num(d.quizBest, 0),
