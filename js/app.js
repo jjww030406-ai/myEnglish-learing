@@ -111,9 +111,17 @@ function todayPlan_raw() {
   }
   return Curriculum.today(masteredCount(), grammarDoneFn());
 }
-/* 把每日目标交给方案引擎：阶段不同，每天的词数不同（6 → 8 → 10 → 12） */
+/* 把每日目标交给方案引擎：阶段不同，每天的词数不同（6 → 8 → 10 → 12）。
+   但优先级更高的是「自适应难度引擎」——它按你最近的正确率实时算，
+   学得吃力就少给几个，学得顺就多加几个。用它来兜住"别一上来就难"。 */
 function syncDailyGoal() {
   const t = todayPlan_raw();
+  if (window.Adaptive) {
+    try {
+      const a = Adaptive.today();
+      if (a && a.wpd) { dailyGoal = a.wpd; return; }
+    } catch (e) {}
+  }
   dailyGoal = t.wpd || 10;
 }
 
@@ -133,7 +141,7 @@ function wStat(word) {
 }
 /* 记录一次练习结果。
    assisted=true 表示"看了答案才拼对的"——见过答案不算真会，连对清零。 */
-function bumpWord(word, ok, assisted) {
+function bumpWord(word, ok, assisted, mode) {
   if (!word) return;
   if (!S.wordStats || typeof S.wordStats !== "object") S.wordStats = {};
   const s = Object.assign({}, EMPTY_WSTAT, S.wordStats[word] || {});
@@ -142,6 +150,14 @@ function bumpWord(word, ok, assisted) {
   else if (ok && assisted)  { s.assisted++; s.streak = 0; }
   else                      { s.wrong++; s.streak = 0; }
   S.wordStats[word] = s;
+  // 记一条流水（只留最近 120 条），供「自适应难度」判断最近的真实手感
+  try {
+    if (!Array.isArray(S.practiceLog)) S.practiceLog = [];
+    S.practiceLog.push({ d: today(), w: word, ok: ok === true, as: assisted === true, m: mode || spMode || "cn" });
+    if (S.practiceLog.length > 120) S.practiceLog = S.practiceLog.slice(-120);
+    // 每答一轮就让难度引擎重新评估一次（内部有节流，不会每次都去问 AI）
+    if (window.Adaptive && typeof Adaptive.onPractice === "function") Adaptive.onPractice();
+  } catch (e) {}
 }
 /* 掌握度 0~5：由"连续拼对次数"决定，0=没学过，5=已掌握 */
 function mastery(word) {
@@ -299,10 +315,12 @@ function recommendMode(mode) {
 function adaptiveQueue(n) {
   const openSet = new Set(openWrongWords());
   const b = { wrong: [], weak: [], fresh: [], solid: [] };
+  // 虚词（of / and / to …）不拿来拼写 —— 背了也说不出话，交给语法课
+  const teachable = w => !window.Adaptive || Adaptive.isTeachable(w.w);
   WORDS.forEach(w => {
     const m = mastery(w.w);
     if (openSet.has(w.w)) b.wrong.push(w);
-    else if (m === 0) b.fresh.push(w);
+    else if (m === 0) { if (teachable(w)) b.fresh.push(w); }
     else if (m === 5) b.solid.push(w);
     else b.weak.push(w);
   });
@@ -338,26 +356,52 @@ function stageWordBand() {
   return [from, to];
 }
 function todayFocusWords(n) {
-  const [from, to] = stageWordBand();
-  const inBand = w => { const idx = WORDS.indexOf(w); return idx >= from && idx < to; };
+  n = Math.max(1, n);
   const openSet = new Set(openWrongWords());
-  const pri = w => {
-    if (openSet.has(w.w)) return 0;
-    const m = mastery(w.w);
-    if (m === 0) return 1;
-    if (m <= 4) return 2;
-    return 3;
-  };
   const seed = today();
-  // 先在本阶段词带里挑（按掌握度优先），挑不够再补其它未掌握词，保证当天总有得练。
-  const pool = WORDS.slice().sort((a, b) => {
-    const da = inBand(a) ? 0 : 1, db = inBand(b) ? 0 : 1;
-    if (da !== db) return da - db;
-    const d = pri(a) - pri(b);
-    if (d) return d;
-    return stableHash(a.w + seed) - stableHash(b.w + seed);
-  });
-  return pool.slice(0, Math.max(1, n));
+  const hash = w => stableHash(w.w + seed);
+
+  // 自适应难度：决定"今天放几个新词"和"新词最深能取到词频第几名"
+  let A = null;
+  if (window.Adaptive) { try { A = Adaptive.today(); } catch (e) { A = null; } }
+  const newN = A ? Math.max(1, Math.round(n * A.newRatio)) : n;
+
+  // ① 该复习的：错题 → 越不熟越优先
+  const due = WORDS.filter(w => openSet.has(w.w) || (mastery(w.w) >= 1 && mastery(w.w) <= 4))
+    .sort((a, b) => {
+      const oa = openSet.has(a.w) ? 0 : 1, ob = openSet.has(b.w) ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      const ma = mastery(a.w), mb = mastery(b.w);
+      if (ma !== mb) return ma - mb;                 // 越不熟越先复习
+      return hash(a) - hash(b);
+    });
+
+  // ② 新词：只从「当前难度允许的常见度」里取，越常用越先学；
+  //    并且跳过 of / and / to 这类虚词（它们该在语法课里学，背了也说不出话）
+  const ok = w => !A || !window.Adaptive.isTeachable || Adaptive.isTeachable(w.w);
+  const score = w => (A ? Adaptive.teachScore(w.w) : 0) || hash(w);
+  const easyFresh = WORDS.filter(w => mastery(w.w) === 0 && !openSet.has(w.w) && ok(w))
+    .filter(w => !A || Adaptive.isEasyEnough(w.w, A.lv))
+    .sort((a, b) => score(a) - score(b));
+  // 兜底：难度范围内没有新词了（比如词库还没长大），才允许取更深的新词
+  const anyFresh = WORDS.filter(w => mastery(w.w) === 0 && !openSet.has(w.w) && ok(w))
+    .sort((a, b) => score(a) - score(b));
+
+  const pick = [], taken = new Set();
+  const take = (arr, k) => {
+    let c = 0;
+    for (const w of arr) {
+      if (c >= k || pick.length >= n) break;
+      if (taken.has(w.w)) continue;
+      taken.add(w.w); pick.push(w); c++;
+    }
+  };
+  take(due, n - newN);        // 先排复习词
+  take(easyFresh, n);         // 再排难度内的新词
+  take(due, n);               // 复习词补位
+  take(anyFresh, n);          // 还不够才放宽难度取新词
+  if (!pick.length) take(WORDS.slice().sort((a, b) => hash(a) - hash(b)), n);
+  return pick;
 }
 /* 离下一阶段还差几个「已掌握」的词。
    注意 tp.remaining 是「本阶段」剩余词数，词够了但本课测验没做完时它是 0 ——
@@ -633,7 +677,12 @@ function bind() {
   document.querySelectorAll("[data-gq]").forEach(b =>
     b.onclick = () => { if (window.GrammarQuiz) { window.GrammarQuiz.pick(+b.dataset.gq, +b.dataset.gk); render(); } });
   var gqSub = document.querySelector("[data-gqsubmit]");
-  if (gqSub) gqSub.onclick = () => { if (window.GrammarQuiz) { window.GrammarQuiz.submit(); render(); } };
+  if (gqSub) gqSub.onclick = () => {
+    if (window.GrammarQuiz) {
+      window.GrammarQuiz.submit(); render();
+      try { if (window.Adaptive) Adaptive.kick(true); } catch (e) {}   // 交卷后重估难度
+    }
+  };
   var gqAgain = document.querySelector("[data-gqagain]");
   if (gqAgain) gqAgain.onclick = () => {
     if (window.GrammarQuiz) {
@@ -1258,6 +1307,7 @@ function viewHome() {
       </button>`).join("")}
   </div>
 
+  ${adaptiveBlock()}
   ${todayPlan()}
   ${aiPlanBlock()}`;
 }
@@ -1307,6 +1357,15 @@ function loadAiPlan() {
     AI_PLAN = { ai_error: "net" };
     render();
   });
+}
+
+/* 自适应难度卡片：把"现在给你定的是什么难度、为什么"摆在首页 */
+function adaptiveBlock() {
+  if (!window.Adaptive) return "";
+  try {
+    Adaptive.kick(false);          // 进首页时顺手让 AI 复核一次（内部节流，不会每次都问）
+    return Adaptive.block();
+  } catch (e) { return ""; }
 }
 
 function aiPlanBlock() {
@@ -2115,13 +2174,13 @@ function spCheck() {
     if (!S.learned.includes(spWord.w)) S.learned.push(spWord.w);
     markTodayWord(spWord.w);
     spJustFixed = markFixedWord(spWord.w);   // 拼对了原本错的词 → 标记订正
-    bumpWord(spWord.w, true, spAssisted);    // 计入掌握度（看答案后拼对的不算真会）
+    bumpWord(spWord.w, true, spAssisted, spMode);   // 计入掌握度（看答案后拼对的不算真会）
   } else {
     // 拼错：不给「下一题」，进入重拼阶段，必须自己再拼一遍
     spChecked = false; spResult = false; spRetry = true;
     spScore.w++;
     markWrongWord(spWord.w);                 // 记入错题本（累计次数 + 最后错误日期）
-    bumpWord(spWord.w, false);               // 掌握度连对清零 → 明天还会再来找你
+    bumpWord(spWord.w, false, false, spMode);  // 掌握度连对清零 → 明天还会再来找你
     spJustFixed = false;
   }
   S.todayCount++;
@@ -2146,6 +2205,8 @@ function spNext() {
   else {
     spListDone = true; spSaveBest();
     if (spReview) { S.lastReview = today(); save(); }   // 复习做完了 → 今天不再提示
+    // 一整轮做完了 → 让 AI 按这轮的表现重新定一次难度（下轮立刻生效）
+    try { if (window.Adaptive) Adaptive.kick(true); } catch (e) {}
   }
   render();
 }
@@ -2184,7 +2245,7 @@ function spRetryCheck() {
     if (!S.learned.includes(spWord.w)) S.learned.push(spWord.w);
     markTodayWord(spWord.w);
     spJustFixed = markFixedWord(spWord.w);
-    bumpWord(spWord.w, true, spAssisted);    // 抄对的（assisted）不算掌握
+    bumpWord(spWord.w, true, spAssisted, spMode);  // 抄对的（assisted）不算掌握
     spChecked = true; spResult = true; spRetry = false;
     spSaveBest(); save(); render();
   } else {
@@ -3085,11 +3146,11 @@ function pickOption(i) {
   answeredPick = parseInt(i);
   answeredIdx = qi;
 
-  if (answeredPick === q.ans) { roundRight++; S.stars++; bumpWord(q.key.w, true); }
+  if (answeredPick === q.ans) { roundRight++; S.stars++; bumpWord(q.key.w, true, false, "quiz"); }
   else {
     S.todayCount++;
     markWrongWord(q.key.w);       // 答错 → 记入错题本
-    bumpWord(q.key.w, false);     // 掌握度清零 → 之后拼写练习会重点出它
+    bumpWord(q.key.w, false, false, "quiz");  // 掌握度清零 → 之后拼写练习会重点出它
   }
   save();
   render();
