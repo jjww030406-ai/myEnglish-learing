@@ -460,6 +460,10 @@ function render() {
   } catch (e) {
     console.error("etym hydrate 出错", e);
   }
+  // AI 自适应路线：仅在首页、且后端已配置时异步拉取（自带加载/连接守卫，不会重复请求）
+  if (view === "home") {
+    try { loadAiPlan(); } catch (e) { console.error("loadAiPlan 出错", e); }
+  }
 }
 
 /* 每日单词状态横幅（联网获取中 / 已就绪 / 离线回落） */
@@ -1161,7 +1165,87 @@ function viewHome() {
       </button>`).join("")}
   </div>
 
-  ${todayPlan()}`;
+  ${todayPlan()}
+  ${aiPlanBlock()}`;
+}
+
+/* ---------- AI 自适应学习路线 ----------
+   把用户真实学习画像发给后端 /api/plan，让 AI 给出"今天该重点练什么"。
+   不配后端（CLOUD_CONFIG.backend 为空）时回落规则提示；AI 不可用也有规则兜底。
+   与今日计划(todayPlan)的关系：todayPlan 是"规则自适应"（基于掌握度/错题/阶段），
+   这里叠加一层"AI 定制路线"，由 DeepSeek 根据薄弱点给出具体建议。 */
+var AI_PLAN = null;          // null=未加载；"no_backend"=未连接；否则为后端返回的对象
+var AI_PLAN_LOADING = false;
+
+function buildProfile() {
+  var ma = {};
+  ["cn", "letter", "dict"].forEach(function (m) {
+    var a = modeAcc(m); ma[m] = (a == null ? null : Math.round(a * 100));
+  });
+  var gd = 0, gt = (typeof GRAMMAR !== "undefined" ? GRAMMAR.length : 29);
+  if (typeof gqState !== "undefined" && gqState) {
+    for (var i = 0; i < gt; i++) { if (gqState[i] && gqState[i].done) gd++; }
+  }
+  return {
+    mastered: masteredCount(),
+    learned: (S.learned || []).length,
+    total_words: (typeof WORDS !== "undefined" ? WORDS.length : 0),
+    open_wrong: openWrongWords().length,
+    streak_days: streakDays(),
+    mode_acc: ma,
+    grammar_done: gd,
+    grammar_total: gt,
+    reading_done: (S.readingDone || []).length,
+    phrasal_done: (S.phrasalQuiz || []).length,
+    stage_id: (stageInfo() || {}).id || ""
+  };
+}
+
+function loadAiPlan() {
+  if (AI_PLAN || AI_PLAN_LOADING) return;                       // 已加载或在加载中
+  if (!backendBase || !backendBase()) { AI_PLAN = "no_backend"; render(); return; }
+  AI_PLAN_LOADING = true;
+  fetchPlan(buildProfile()).then(function (p) {
+    AI_PLAN_LOADING = false;
+    AI_PLAN = p || { ai_error: "empty" };
+    render();
+  }).catch(function () {
+    AI_PLAN_LOADING = false;
+    AI_PLAN = { ai_error: "net" };
+    render();
+  });
+}
+
+function aiPlanBlock() {
+  var cls = "card ai-plan";
+  if (AI_PLAN === null) {
+    return `<div class="${cls}" id="aiPlanCard"><h3>🤖 AI 学习计划</h3><p class="muted">正在分析你的学习情况…</p></div>`;
+  }
+  if (AI_PLAN === "no_backend") {
+    return `<div class="${cls}" id="aiPlanCard"><h3>🤖 AI 学习计划</h3><p class="muted">未连接 AI 后端。在 <code>CLOUD_CONFIG.backend</code> 填入你的 Python 后端地址后，AI 会根据你的真实进度定制每日学习路线。当前按规则自适应练习。</p></div>`;
+  }
+  var p = AI_PLAN;
+  var FICON = { word: "📘", grammar: "📐", reading: "📖", phrasal: "🔗", review: "🔁", speaking: "🗣️" };
+  var focus = (p.today_focus || []).map(function (f) {
+    var ic = FICON[f.type] || "✅";
+    return `<li><span class="fp-ic">${ic}</span><div><b>${esc(f.title || "")}</b><span class="muted">${esc(f.why || "")} → ${esc(f.action || "")}</span></div></li>`;
+  }).join("");
+  var weak = (p.weak_points || []).map(function (w) { return `<span class="tag">${esc(w)}</span>`; }).join("");
+  var badge = p.ai_error ? `<span class="plan-fallback">规则兜底</span>` : `<span class="plan-ai">AI 定制</span>`;
+  return `<div class="${cls}" id="aiPlanCard">
+    <h3>🤖 AI 今日学习重点 ${badge}</h3>
+    ${p.stage ? `<p class="ai-stage">${esc(p.stage)}</p>` : ""}
+    ${p.summary ? `<p>${esc(p.summary)}</p>` : ""}
+    ${focus ? `<ul class="ai-focus">${focus}</ul>` : ""}
+    ${weak ? `<p class="muted ai-weak">薄弱点：${weak}</p>` : ""}
+    ${p.next_milestone ? `<p class="muted ai-ms">🎯 ${esc(p.next_milestone)}</p>` : ""}
+  </div>`;
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
 }
 
 /* ---------- 今日计划（自适应） ----------
