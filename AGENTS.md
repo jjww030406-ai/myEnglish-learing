@@ -50,6 +50,13 @@
 - Supabase：`cloud-config.js` 里的 `anonKey` 已公开可留；**绝不放 `service_role` key**
 - DeepSeek key：可选，作 `server.py` 兜底，通过 `AI_API_KEY` 传入，别写进前端
 
+## 计分规则（关键常量，接手改分时看这里）
+- **拼句打字**（`viewSent` / `submitSentWord`）：每词基础 **+10**，连对奖励 **+min(combo,10)×2**
+  （第 1 词 +12、第 2 词 +14 … 连对封顶 10 时该词 +30）；整句**零失误 Perfect** 额外 **+50** 且 **+1⭐**；
+  显示答案 / 出错会 `stCombo=0`、`stErrThis++`（既不算连对也无 Perfect 加成）。
+  整句拼完统一 `S.stars++`。
+- 其它模块的积分/星星逻辑在 `js/app.js` 各 `view*` 里，改前先搜 `S.stars` / `stRoundScore` 定位。
+
 ## 历史设计决策（别推翻，避免重复踩坑）
 - **拼句打字模块**（`viewSent`）：看中文逐词敲英文，拼对的词变彩色成分卡（主语/谓语/宾语…）。
   底部按钮栏可鼠标点也可用快捷键（`Ctrl+1` 发音 / `Ctrl+;` 显示答案 / `Ctrl+R` 重打）；
