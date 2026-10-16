@@ -30,6 +30,17 @@
   };
   window.TODAY_STR = localDateStr();
 
+  // 口语基础库快照（data.js 的 72 句），稍后和分级语料、云端共享合并进全局 PHRASES
+  var BASE_PHRASES = (typeof PHRASES !== "undefined") ? PHRASES.slice() : [];
+  // 基础 72 句对应的阶段 level（沿用 curriculum 原分配：索引 0-40 对应 s1-s14）
+  var BASE_PHRASE_LEVEL = {};
+  [[1, [0, 1, 2]], [2, [3, 4, 5, 6]], [3, [7, 8, 9, 10]], [4, [11, 12]], [5, [13, 14, 15]],
+   [6, [16, 17, 18]], [7, [19, 20]], [8, [21, 22, 23]], [9, [24, 25]], [10, [26, 27, 28]],
+   [11, [29, 30, 31]], [12, [32, 33, 34]], [13, [35, 36, 37]], [14, [38, 39, 40]]].forEach(function (p) {
+    p[1].forEach(function (i) { BASE_PHRASE_LEVEL[i] = p[0]; });
+  });
+  function phraseLevel(i) { return BASE_PHRASE_LEVEL[i] || 14; }
+
   // 虚词黑名单：这些不是"生词卡"该教的（语法课里教），自动跳过，不生成卡片
   var STOP = {};
   ("the of and to in for is on that by this with it not or be are from at as all more an was will can us if " +
@@ -195,6 +206,56 @@
     WORDS = out;
   }
 
+  /* ---------------- 口语（PHRASES）动态装配：基础72 + 分级语料 + 云端共享 ----------------
+     基础 72 句永远排在最前（索引 0-71 稳定，"已会"记录才不会因为顺序变化而错位），
+     之后接分级扩展语料（phrases-extra.js，按 level 1-14），最后接云端共享新增句。
+     今日练哪几句由 app.js 的 todayPhrases() 按用户当前阶段 level 过滤决定。 */
+  var SHARED_PHRASES_KEY = "__global_phrases__";
+  async function sbLoadSharedPhrases() {
+    if (!SYNC.enabled || !SYNC.url) return [];
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_PHRASES_KEY + "&select=data", { headers: sbHeaders() });
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var arr = (rows && rows[0] && rows[0].data && rows[0].data.phrases) || [];
+      return arr.map(function (x) { return { en: x.en, cn: x.cn || "", ph: x.ph || "", level: x.level || 14 }; });
+    } catch (e) { return []; }
+  }
+  async function sbUpsertPhrases(arr) {
+    if (!SYNC.enabled || !SYNC.url || !arr.length) return;
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_PHRASES_KEY + "&select=data", { headers: sbHeaders() });
+      var old = [];
+      if (r.ok) { var rows = await r.json(); old = (rows && rows[0] && rows[0].data && rows[0].data.phrases) || []; }
+      var seen = {}, merged = [];
+      old.forEach(function (x) { if (x && x.en && !seen[x.en]) { seen[x.en] = 1; merged.push(x); } });
+      arr.forEach(function (x) { if (x && x.en && !seen[x.en]) { seen[x.en] = 1; merged.push(x); } });
+      await fetch(SYNC.url + "/rest/v1/learning_progress", {
+        method: "POST", headers: sbHeaders(),
+        body: JSON.stringify([{ profile_id: SHARED_PHRASES_KEY, data: { phrases: merged }, updated_at: new Date().toISOString() }])
+      });
+    } catch (e) {}
+  }
+  function applyPhrases(extra, shared) {
+    var seen = {}, out = [];
+    function add(p) { if (p && p.en && !seen[p.en]) { seen[p.en] = 1; out.push(p); } }
+    BASE_PHRASES.forEach(function (p, i) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || phraseLevel(i); add(q); });
+    (extra || []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 14; add(q); });
+    (shared || []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 14; add(q); });
+    PHRASES = out;
+    return out;
+  }
+  async function loadDailyPhrases() {
+    var shared = await sbLoadSharedPhrases();
+    var extra = (typeof PHRASES_EXTRA !== "undefined") ? PHRASES_EXTRA : [];
+    applyPhrases(extra, shared);
+    // 首次（云端还没存过）把分级语料也写进共享，让其他用户能学到
+    if (shared.length === 0 && extra.length) {
+      sbUpsertPhrases(extra.map(function (p) { return { en: p.en, cn: p.cn, ph: p.ph, level: p.level }; }));
+    }
+    return PHRASES;
+  }
+
   /* ---------------- 主流程 ---------------- */
   async function loadDailyWords() {
     var dateStr = localDateStr();
@@ -252,9 +313,99 @@
     return { words: WORDS, info: window.DAILY_INFO };
   }
 
+  /* ---------------- 阅读（READING）动态装配：基础12 + 分级语料 + 云端共享 ---------------- */
+  var SHARED_READING_KEY = "__global_reading__";
+  async function sbLoadSharedReading() {
+    if (!SYNC.enabled || !SYNC.url) return [];
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_READING_KEY + "&select=data", { headers: sbHeaders() });
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var arr = (rows && rows[0] && rows[0].data && rows[0].data.reading) || [];
+      return arr.map(function (x) { return { lv: x.lv || 1, topic: x.topic || "", title: x.title || "", en: x.en || "", cn: x.cn || "" }; });
+    } catch (e) { return []; }
+  }
+  async function sbUpsertReading(arr) {
+    if (!SYNC.enabled || !SYNC.url || !arr.length) return;
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_READING_KEY + "&select=data", { headers: sbHeaders() });
+      var old = [];
+      if (r.ok) { var rows = await r.json(); old = (rows && rows[0] && rows[0].data && rows[0].data.reading) || []; }
+      var seen = {}, merged = [];
+      old.forEach(function (x) { if (x && x.title && !seen[x.title]) { seen[x.title] = 1; merged.push(x); } });
+      arr.forEach(function (x) { if (x && x.title && !seen[x.title]) { seen[x.title] = 1; merged.push(x); } });
+      await fetch(SYNC.url + "/rest/v1/learning_progress", { method: "POST", headers: sbHeaders(), body: JSON.stringify([{ profile_id: SHARED_READING_KEY, data: { reading: merged }, updated_at: new Date().toISOString() }]) });
+    } catch (e) {}
+  }
+  function applyReading(extra, shared) {
+    var seen = {}, out = [];
+    function add(p) { if (p && p.title && !seen[p.title]) { seen[p.title] = 1; out.push(p); } }
+    (typeof READING !== "undefined" ? READING : []).forEach(add);
+    (extra || []).forEach(add);
+    (shared || []).forEach(add);
+    READING = out;
+    return out;
+  }
+  async function loadDailyReading() {
+    var shared = await sbLoadSharedReading();
+    var extra = (typeof READING_EXTRA !== "undefined") ? READING_EXTRA : [];
+    applyReading(extra, shared);
+    if (shared.length === 0 && extra.length) sbUpsertReading(extra.map(function (p) { return { lv: p.lv, topic: p.topic, title: p.title, en: p.en, cn: p.cn }; }));
+    return READING;
+  }
+
+  /* ---------------- 语法（GRAMMAR）动态装配：基础20 + 分级课 + 云端共享 ---------------- */
+  var SHARED_GRAMMAR_KEY = "__global_grammar__";
+  var BASE_GRAMMAR_LEVEL = {};
+  [[1, [0]], [2, [1, 2]], [3, [3]], [4, [4]], [5, [5]], [6, [6]], [7, [7]], [8, [8]], [9, [9]], [10, [10, 11]], [11, [12, 13]], [12, [14, 15]], [13, [16, 17]], [14, [18, 19]]].forEach(function (p) {
+    p[1].forEach(function (i) { BASE_GRAMMAR_LEVEL[i] = p[0]; });
+  });
+  function grammarLevel(i) { return BASE_GRAMMAR_LEVEL[i] || 14; }
+  async function sbLoadSharedGrammar() {
+    if (!SYNC.enabled || !SYNC.url) return [];
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_GRAMMAR_KEY + "&select=data", { headers: sbHeaders() });
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var arr = (rows && rows[0] && rows[0].data && rows[0].data.grammar) || [];
+      return arr.map(function (x) { return x; });
+    } catch (e) { return []; }
+  }
+  async function sbUpsertGrammar(arr) {
+    if (!SYNC.enabled || !SYNC.url || !arr.length) return;
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_GRAMMAR_KEY + "&select=data", { headers: sbHeaders() });
+      var old = [];
+      if (r.ok) { var rows = await r.json(); old = (rows && rows[0] && rows[0].data && rows[0].data.grammar) || []; }
+      var seen = {}, merged = [];
+      old.forEach(function (x) { if (x && x.t && !seen[x.t]) { seen[x.t] = 1; merged.push(x); } });
+      arr.forEach(function (x) { if (x && x.t && !seen[x.t]) { seen[x.t] = 1; merged.push(x); } });
+      await fetch(SYNC.url + "/rest/v1/learning_progress", { method: "POST", headers: sbHeaders(), body: JSON.stringify([{ profile_id: SHARED_GRAMMAR_KEY, data: { grammar: merged }, updated_at: new Date().toISOString() }]) });
+    } catch (e) {}
+  }
+  function applyGrammar(extra, shared) {
+    var seen = {}, out = [];
+    function add(p) { if (p && p.t && !seen[p.t]) { seen[p.t] = 1; out.push(p); } }
+    (typeof GRAMMAR !== "undefined" ? GRAMMAR : []).forEach(function (p, i) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || grammarLevel(i); add(q); });
+    (extra || []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 14; add(q); });
+    (shared || []).forEach(add);
+    GRAMMAR = out;
+    return out;
+  }
+  async function loadDailyGrammar() {
+    var shared = await sbLoadSharedGrammar();
+    var extra = (typeof GRAMMAR_EXTRA !== "undefined") ? GRAMMAR_EXTRA : [];
+    applyGrammar(extra, shared);
+    if (shared.length === 0 && extra.length) sbUpsertGrammar(extra.map(function (p) { return p; }));
+    return GRAMMAR;
+  }
+
   window.DailyEngine = {
-    loadDailyWords: loadDailyWords, pickDaily: pickDaily, extractJSON: extractJSON,
-    localDateStr: localDateStr, fetchDict: fetchDict, genCn: genCn, applyWords: applyWords
+    loadDailyWords: loadDailyWords, loadDailyPhrases: loadDailyPhrases,
+    loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar,
+    pickDaily: pickDaily, extractJSON: extractJSON,
+    localDateStr: localDateStr, fetchDict: fetchDict, genCn: genCn,
+    applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { pickDaily: pickDaily, extractJSON: extractJSON, localDateStr: localDateStr };
