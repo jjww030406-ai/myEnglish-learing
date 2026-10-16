@@ -2805,13 +2805,16 @@ function phTestQuestion(it) {
 function startPhrasalTest() {
   const list = buildPhrasalTest();
   if (!list.length) { alert("暂无可测内容"); return; }
-  phTest = { active: true, list: list, qi: 0, picked: -1, right: 0 };
+  phTest = { active: true, list: list, qi: 0, picked: -1, right: 0, opts: null };
   render();
 }
 function phTestPick(k) {
   if (phTest.picked >= 0) return;
   const it = phTest.list[phTest.qi];
-  const opts = phTestQuestion(it);
+  // 关键修复：判定必须用「页面上正在显示的那份选项」。
+  // 以前这里重新调 phTestQuestion 再洗一次牌，导致你点的 A 和判定用的 A 不是同一个词 —— 选 A 判成 B 就是这么来的。
+  const opts = phTest.opts || phTestQuestion(it);
+  phTest.opts = opts;
   phTest.picked = k;
   if (k === opts.indexOf(it.a)) phTest.right++;
   S.phrasalQuiz = S.phrasalQuiz || [];
@@ -2826,12 +2829,17 @@ function phTestNext() {
     phTest.active = false; phTest.list = []; render();
     return;
   }
-  phTest.qi++; phTest.picked = -1; render();
+  phTest.qi++; phTest.picked = -1; phTest.opts = null; render();
+}
+/* 按短语找词条（解析用），找不到给空对象兜底 */
+function pvOf(phrase) {
+  return (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : []).find(x => x.phrase === phrase) || {};
 }
 function phrasalTestBlock() {
   const it = phTest.list[phTest.qi];
   if (!it) return "";
-  const opts = phTestQuestion(it);
+  if (!phTest.opts) phTest.opts = phTestQuestion(it);   // 每题只洗一次牌，判定/标色都用这份
+  const opts = phTest.opts;
   const done = phTest.picked >= 0;
   const ok = done && phTest.picked === opts.indexOf(it.a);
   return `
@@ -2846,7 +2854,11 @@ function phrasalTestBlock() {
         return `<button class="${cls}" data-pht="${k}" ${done ? "disabled" : ""}>${"ABC"[k] || k + 1}. ${o}</button>`;
       }).join("")}
     </div>
-    ${done ? `<p class="${ok ? "sp-fb good" : "sp-fb bad"}">${ok ? "✅ 答对了！" : "❌ 正确答案：" + it.a}</p>` : ""}
+    ${done ? `<div class="pht-exp ${ok ? "good" : "bad"}">
+      <b>${ok ? "✅ 答对了！" : "❌ 正确答案：" + it.a}</b>
+      <p>📖 <b>解析</b>：「${it.phrase}」是固定搭配${pvOf(it.phrase).cn ? `，意思是「${pvOf(it.phrase).cn}」` : ""}。这个空只能填 <b>${it.a}</b>，合起来就是 <b>${it.phrase}</b>${pvOf(it.phrase).pat && pvOf(it.phrase).pat !== "不接宾语" ? `（后面接 ${pvOf(it.phrase).pat}）` : ""}。</p>
+      <p>完整句子：<b>${it.s.replace(/＿＿+|___+/, it.a)}</b>${it.cn ? `（${it.cn}）` : ""}</p>
+    </div>` : ""}
     ${done ? `<button class="btn primary" id="phtNext">${phTest.qi >= phTest.list.length - 1 ? "看结果 →" : "下一题 →"}</button>` : ""}
   </div>`;
 }
