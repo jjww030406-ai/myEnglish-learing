@@ -481,12 +481,21 @@ var mascotLeaveTimer = null; // 鼠标移开后收（0.4 秒）
    鼠标移开猫头鹰 / 自己去点别的地方 / 说完 6 秒自动收。
    两个定时器分开：鼠标停在猫头鹰上可以慢慢看完那句话（取消"移开"的收起），
    但"说完 6 秒"这条不受影响 —— 否则鼠标不小心压在上面，气泡就一直挂着不走了。 */
+function mascotInner() {
+  return `<span class="mc">🦉</span>` +
+    (mascotMsg ? `<span class="mc-bubble" role="status"><b>${mascotFace}</b>${mascotMsg}</span>` : "");
+}
+function refreshMascot() {
+  // 只更新吉祥物按钮内部，不重绘整页（否则点一下会让所有卡片入场动画重播、整页闪一下）
+  const m = document.querySelector("[data-mascot]");
+  if (m) m.innerHTML = mascotInner();
+}
 function hideMascot() {
   if (mascotTimer)      { clearTimeout(mascotTimer);      mascotTimer = null; }
   if (mascotLeaveTimer) { clearTimeout(mascotLeaveTimer); mascotLeaveTimer = null; }
   if (!mascotMsg) return;
   mascotMsg = "";
-  render();
+  refreshMascot();
 }
 function armMascotTimer(ms) {
   if (mascotTimer) clearTimeout(mascotTimer);
@@ -517,7 +526,9 @@ function tapMascot() {
   pool.push(["📈", `连续打卡 ${S.days.length} 天了，别断。`]);
   const p = pool[Math.floor(Math.random() * pool.length)];
   mascotFace = p[0]; mascotMsg = p[1]; mascotTap++;
-  render();
+  refreshMascot();
+  const _m = document.querySelector("[data-mascot]");
+  if (_m) { _m.classList.remove("tapped"); void _m.offsetWidth; _m.classList.add("tapped"); }
   armMascotTimer(6000);   // 说完 6 秒自动收，不靠用户记得关
 }
 
@@ -1181,10 +1192,9 @@ function viewHome() {
       <h1>${heroTitle}</h1>
       <p>${heroSub}</p>
     </div>
-    <button class="hero-mascot${mascotTap ? " tapped" : ""}" data-mascot="1"
+    <button class="hero-mascot" data-mascot="1"
             aria-label="点一下吉祥物" title="点我聊两句">
-      <span class="mc">🦉</span>
-      ${mascotMsg ? `<span class="mc-bubble" role="status"><b>${mascotFace}</b>${mascotMsg}</span>` : ""}
+      ${mascotInner()}
     </button>
   </section>
 
