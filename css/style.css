@@ -2533,3 +2533,13 @@ h2 { margin: 4px 0 14px; }
   padding: 2px 8px; border-radius: 999px;
   background: var(--coral); color: #fff;
 }
+
+/* ===== 固定搭配专练：答案解析块 ===== */
+.pht-exp {
+  margin-top: 12px; padding: 12px 15px; border-radius: 12px;
+  font-size: 14px; line-height: 1.7;
+}
+.pht-exp.good { background: #EFFAF3; border: 1px solid #C9ECD6; }
+.pht-exp.bad  { background: #FFF3F0; border: 1px solid #F6CFC7; }
+.pht-exp b { color: var(--txt); }
+.pht-exp p { margin: 6px 0 0; }
