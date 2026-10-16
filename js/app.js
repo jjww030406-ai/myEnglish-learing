@@ -2526,7 +2526,7 @@ function viewPhrases() {
           <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊</button>
           <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">${srRecording && srIdx === i ? "🎤 停止" : "🎤 说"}</button>
           <button class="mini" data-phrase="${i}">我会了</button>
-          ${srIdx === i && (srActive ? `<div class="ph-listening">🎤 正在听…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "")}
+          ${srIdx === i ? (srActive ? `<div class="ph-listening">🎤 正在听…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "") : ""}
           ${srIdx === i && srCompare ? phraseCmpHtml(p, i) : ""}
         </div>`;
       }).join("")}
@@ -2563,7 +2563,7 @@ function viewPhrases() {
       <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊 朗读</button>
       <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">${srRecording && srIdx === i ? "🎤 停止" : "🎤 说给我听"}</button>
       <button class="mini ${phraseDone(i) ? "ph-done" : ""}" data-phrase="${i}">${phraseDone(i) ? "✅ 已会" : "我会了"}</button>
-      ${srIdx === i && (srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "")}
+      ${srIdx === i ? (srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "") : ""}
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
     </div>`).join("")}
   </div>
