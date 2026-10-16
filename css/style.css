@@ -2543,3 +2543,59 @@ h2 { margin: 4px 0 14px; }
 .pht-exp.bad  { background: #FFF3F0; border: 1px solid #F6CFC7; }
 .pht-exp b { color: var(--txt); }
 .pht-exp p { margin: 6px 0 0; }
+
+/* ===== 语法「每日一练」：5 道选择题 + 答案 + 解析 ===== */
+.gq-card { padding: 22px 24px; }
+.gq-head {
+  font-size: 18px; font-weight: 900; letter-spacing: .2px;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.gq-head .muted { font-size: 12px; font-weight: 600; }
+.gq-card > p.muted { margin: 0 0 16px; font-size: 13px; line-height: 1.7; }
+
+.gq-item {
+  padding: 16px 18px; margin-bottom: 12px;
+  border: 1px solid var(--line); border-radius: 14px;
+  background: linear-gradient(180deg, #fff, #FCFCFE);
+}
+.gq-q {
+  font-size: 16px; font-weight: 700; line-height: 1.7; color: var(--txt);
+  margin-bottom: 12px; word-break: break-word;
+}
+.gq-blank {
+  display: inline-block; min-width: 52px; padding: 0 8px;
+  border-bottom: 2px solid var(--coral); color: var(--coral); font-weight: 900;
+}
+.gq-opts { display: flex; flex-wrap: wrap; gap: 10px; }
+.gq-opts .btn {
+  flex: 1 1 210px; justify-content: flex-start; text-align: left;
+  padding: 10px 14px; font-size: 14px; line-height: 1.5; border-radius: 12px;
+}
+.gq-opts .btn.on {
+  border-color: var(--coral) !important; color: var(--coral-d) !important;
+  background: var(--soft) !important; font-weight: 800;
+}
+.gq-opts .btn[disabled] { opacity: 1; cursor: default; }
+
+.gq-exp {
+  margin-top: 12px; padding: 12px 15px; border-radius: 12px;
+  font-size: 14px; line-height: 1.75;
+}
+.gq-exp.good { background: #EFFAF3; border: 1px solid #C9ECD6; }
+.gq-exp.bad  { background: #FFF3F0; border: 1px solid #F6CFC7; }
+.gq-exp b { color: var(--txt); }
+.gq-exp p { margin: 6px 0 0; }
+
+.gq-foot {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-top: 14px; border-top: 1px dashed var(--line);
+}
+.gq-score { font-size: 15px; font-weight: 800; }
+.gq-score b { color: var(--coral); font-size: 20px; }
+
+@media (max-width: 640px) {
+  .gq-card { padding: 16px 14px; }
+  .gq-item { padding: 13px 12px; }
+  .gq-opts .btn { flex: 1 1 100%; }
+}
