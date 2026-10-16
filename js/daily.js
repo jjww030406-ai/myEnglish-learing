@@ -315,6 +315,17 @@
     } catch (e) { return null; }
   }
 
+  // 把用户学习画像发给后端 /api/plan，让 AI 给出今日重点（不配后端则回落 null）
+  function fetchPlan(profile) {
+    var base = backendBase();
+    if (!base) return Promise.resolve(null);
+    return fetch(base + "/api/plan", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile: profile || {} })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+
   /* ---------------- 主流程 ---------------- */
   async function loadDailyWords() {
     var dateStr = localDateStr();
