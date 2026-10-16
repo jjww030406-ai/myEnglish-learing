@@ -56,6 +56,21 @@
         day = String(d.getDate()).padStart(2, "0");
     return y + "-" + m + "-" + day;
   }
+  /* ---------------- 断更补齐 ----------------
+     记录"上次补充词库的日期"（localStorage），回来时按漏掉的天数一次性补齐，
+     最多补齐 MAX_MAKEUP_DAYS 天，避免一次抓太多打爆免费 API。 */
+  var SUP_KEY = "el_lastsup";
+  var DAILY_N = 30;            // 每天常态化补充量（与 pickDaily 批次一致）
+  var MAX_MAKEUP_DAYS = 14;    // 断更最多补齐的天数上限
+  function readLastSup() { try { return localStorage.getItem(SUP_KEY) || null; } catch (e) { return null; } }
+  function writeLastSup(d) { try { localStorage.setItem(SUP_KEY, d); } catch (e) {} }
+  function daysBetween(a, b) {
+    if (!a) return 0;
+    var da = new Date(a + "T00:00:00"), db = new Date(b + "T00:00:00");
+    if (isNaN(da) || isNaN(db)) return 0;
+    var diff = Math.round((db - da) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
   function pickDaily(list, n, dateStr) {
     list = list || [];
     if (!list.length) return [];
@@ -289,16 +304,23 @@
     var queue = (typeof WORD_FREQ !== "undefined" && WORD_FREQ.length) ? WORD_FREQ
               : (typeof WORD_LIST !== "undefined" ? WORD_LIST : []);
 
-    var picked = pickDaily(queue, 30, dateStr);
+    // 断更补齐：上次补充到今天差几天，就一次性补几天（封顶 MAX_MAKEUP_DAYS）
+    var missed = daysBetween(readLastSup(), dateStr);
+    var days = Math.max(1, Math.min(missed + 1, MAX_MAKEUP_DAYS));   // +1 含今天；同一天则只补 1 天
+    var want = Math.min(days * DAILY_N, (queue && queue.length) || 0);
+    var makeupNote = days > 1 ? ("补齐 " + days + " 天漏学的") : "今日";
+
+    var picked = pickDaily(queue, want, dateStr);
     var need = picked.filter(function (w) { return !have[w] && !STOP[w] && /^[a-z]{2,12}$/.test(w); });
 
     if (!need.length) {
+      writeLastSup(dateStr);                     // 今天已补过，记一下，避免重复补
       window.DAILY_INFO = { status: "ok", text: "🌐 词库已就绪 · 共 " + WORDS.length + " 词（每天自动补充）" };
       applyWords(lib); safeRender();
       return { words: WORDS, info: window.DAILY_INFO };
     }
 
-    window.DAILY_INFO = { status: "loading", text: "🌐 正在补充新词… (0/" + need.length + ")" };
+    window.DAILY_INFO = { status: "loading", text: "🌐 正在" + makeupNote + "新词… (0/" + need.length + ")" };
     safeRender();
 
     var fresh = [];
@@ -311,7 +333,7 @@
         if (!extra && cloud) { var g = await genCn(dict || { w: w }); if (g) extra = g; }
         if (!dict && !extra) return null;            // 连词典都查不到，跳过这个词
         done++;
-        window.DAILY_INFO = { status: "loading", text: "🌐 正在补充新词… (" + done + "/" + need.length + ")" };
+        window.DAILY_INFO = { status: "loading", text: "🌐 正在" + makeupNote + "新词… (" + done + "/" + need.length + ")" };
         safeRender();
         return assemble(w, dict, extra || {});
       })();
@@ -323,10 +345,11 @@
       saveLib(lib);
       sbUpsert(fresh);                          // 写回云端共享词库，其他用户也能用
     }
+    writeLastSup(dateStr);                       // 无论补了多少，今天算补过了
     applyWords(lib);
     window.DAILY_INFO = {
       status: "ok",
-      text: "🌐 今日新增 " + fresh.length + " 个单词 · 词库共 " + WORDS.length + " 词（每天自动补充）"
+      text: "🌐 " + makeupNote + "新词 " + fresh.length + " 个 · 词库共 " + WORDS.length + " 词"
     };
     safeRender();
     return { words: WORDS, info: window.DAILY_INFO };
