@@ -1390,6 +1390,22 @@ h2 { letter-spacing: .4px; }
 .rd-wrong-ph { color:var(--muted); font-size:13px; }
 .rd-actions { display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap; }
 .rd-result { font-weight:700; color:var(--brand-d); }
+.btn.ghost { background:var(--card); border-color:var(--line); color:var(--brand-d); }
+.btn.ghost:hover { border-color:var(--brand); color:var(--brand); box-shadow:var(--shadow-sm); }
+
+/* 阅读·全对庆祝（撒花 + 横幅） */
+.rd-celebrate { position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; pointer-events:none; }
+.rd-celebrate.show { display:flex; }
+.rd-celebrate::before { content:""; position:absolute; inset:0; background:rgba(18,28,58,.30); pointer-events:auto; cursor:pointer; }
+.rd-praise { position:relative; z-index:2; background:#fff; border-radius:18px; padding:26px 36px; text-align:center; box-shadow:0 22px 60px rgba(0,0,0,.32); animation:rdPop .42s cubic-bezier(.2,1.5,.4,1); pointer-events:auto; }
+@keyframes rdPop { from { transform:scale(.6); opacity:0; } to { transform:scale(1); opacity:1; } }
+.rd-praise-emoji { font-size:56px; line-height:1; animation:rdBounce .85s ease-in-out infinite alternate; }
+@keyframes rdBounce { from { transform:translateY(0) rotate(-4deg); } to { transform:translateY(-9px) rotate(4deg); } }
+.rd-praise-txt { font-size:21px; font-weight:800; color:var(--brand-d); margin-top:8px; line-height:1.5; }
+.rd-praise-txt small { display:block; font-weight:600; color:var(--muted); font-size:13px; margin-top:4px; }
+.rd-confetti { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.rd-confetti span { position:absolute; top:-42px; will-change:transform; animation:rdFall 2.2s linear forwards; }
+@keyframes rdFall { to { transform:translateY(112vh) rotate(540deg); opacity:0; } }
 
 /* 云端同步状态（仅启用云端时出现） */
 .chip.chip-cloud { border-color:#3aa0ff; color:#1f7ad6; background:#eaf6ff; }
