@@ -2599,3 +2599,32 @@ h2 { margin: 4px 0 14px; }
   .gq-item { padding: 13px 12px; }
   .gq-opts .btn { flex: 1 1 100%; }
 }
+
+/* ===== 自适应难度卡片（首页：AI 实时给你定的难度） ===== */
+.adaptive-card { padding: 20px 24px; }
+.ad-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.ad-title { font-size: 17px; font-weight: 900; letter-spacing: .2px; }
+.ad-src {
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px;
+  background: #F1F3F7; color: #7A828E; border: 1px solid var(--line);
+}
+.ad-src.is-ai { background: var(--soft); color: var(--coral-d); border-color: var(--coral); }
+.ad-sub { margin: 0 0 12px; font-size: 13px; }
+.ad-lines { margin: 0; padding: 0; list-style: none; }
+.ad-lines li {
+  font-size: 14px; line-height: 1.75; color: var(--txt);
+  padding: 5px 0 5px 2px;
+}
+.ad-lines li b { color: var(--coral-d); }
+.ad-foot { margin: 12px 0 0; font-size: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+
+@media (max-width: 640px) {
+  .adaptive-card { padding: 15px 14px; }
+  .ad-title { font-size: 15px; }
+}
+
+/* 顶栏在窄屏下会多出 3px 造成横向滚动，压回去 */
+.top { max-width: 100%; }
