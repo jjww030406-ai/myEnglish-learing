@@ -1629,7 +1629,7 @@ footer::before { content: "🌱 "; }
     animation: none !important;
   }
 }
-.home-stats .hs-text .muted { white-space: nowrap; font-size: 12px; }
+.home-stats .hs-text .muted { white-space: normal; font-size: 11.5px; line-height: 1.3; }
 
 /* =====================================================================
    拼句打字（参考句乐部玩法）：彩色成分卡 + 居中拼装台
@@ -1749,3 +1749,224 @@ footer::before { content: "🌱 "; }
   .st-key { padding: 7px 12px; font-size: 12.5px; }
   .st-key kbd { display: none; }   /* 手机上不显示键盘帽，只留文字按钮 */
 }
+
+/* =====================================================================
+   美术升级 v4 —— 收敛留白 / 强化层次 / 组件精修（纯样式叠加）
+   ===================================================================== */
+
+/* ---------- 1. 版面收敛：内容不再散在大片空白里 ---------- */
+.wrap { max-width: 1040px; padding: 26px 24px 96px; }
+@media (max-width: 1080px) { .wrap { max-width: 100%; } }
+
+/* 页面标题头（返回首页那条）做成更有分量的页眉 */
+.page-head {
+  background: linear-gradient(120deg, #ffffff, var(--brand2));
+  border: 1px solid var(--line); border-left: 4px solid var(--brand);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-sm);
+}
+.page-head h3 { font-size: 20px; }
+
+/* 正文小标题：页眉蓝色竖条更有存在感 */
+h2 {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 20px; letter-spacing: .2px; margin: 6px 0 12px;
+}
+h2::before { height: 20px; }
+
+/* ---------- 2. 卡片：层次更清楚、悬停更克制 ---------- */
+.card {
+  padding: 22px 24px; border-radius: 18px; margin-bottom: 18px;
+  background: linear-gradient(180deg, #ffffff, #fdfeff);
+}
+.card > h3:first-child,
+.card > b:first-child { display: block; font-size: 16.5px; margin-bottom: 8px; }
+
+/* 网格扇出时给足呼吸，但不至于散 */
+.grid2 { gap: 18px; }
+.grid4 { gap: 18px; }
+
+/* .step 小卡：加左侧色条 + hover 抬升，不再是一模一样的方块 */
+.step {
+  position: relative; border-radius: 15px; padding: 18px 20px;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.step::before {
+  content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+  border-radius: 99px; background: var(--brand); opacity: .35;
+}
+.step:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: #d9e3ff; }
+
+/* ---------- 3. 测验/选项：更大更清晰 ---------- */
+.opts { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.opt {
+  padding: 18px 20px; border-radius: 14px; font-size: 17px; font-weight: 600;
+  border-width: 1.5px; background: var(--card); color: var(--txt);
+}
+.opt:hover:not(:disabled) {
+  border-color: var(--brand); color: var(--brand-d); transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(59,109,255,.14);
+}
+.opt.right { background: linear-gradient(180deg,#e9f9f2,#e2f6ec); font-weight: 700; }
+.opt.wrong { background: linear-gradient(180deg,#fdeeee,#fbe6e6); font-weight: 700; }
+.quizzq { font-size: 21px; font-weight: 800; line-height: 1.6; }
+
+/* 测验页：把大空白收掉 —— 卡片区域给个舒适留白而不是整片空 */
+.quizzq { padding: 4px 2px 10px; }
+
+/* ---------- 4. 统计横条（我的页）：一行一格更精致 ---------- */
+.home-stats .hs { padding: 13px 14px; }
+.home-stats .hs .big { font-size: 24px; }
+.hs-ico { font-size: 20px; }
+
+/* ---------- 5. 按钮：统一精致 ---------- */
+.btn { padding: 11px 20px; font-weight: 700; letter-spacing: .2px; }
+.btn:not(.primary):hover { border-color: var(--brand); color: var(--brand-d); }
+
+/* ---------- 6. 进度条/输入框等细节融合 ---------- */
+input, textarea, select { border-radius: 11px; }
+select { padding: 9px 12px; }
+
+/* ---------- 7. 页脚更轻，不抢戏 ---------- */
+footer { margin-top: 26px; }
+
+/* ---------- 8. 深色时段：内页卡片别太刺白 ---------- */
+html[data-theme="night"] .page-head { background: linear-gradient(120deg,#232a3d,#1e2438); }
+
+/* =====================================================================
+   美术升级 v5 —— 测验/拼写"专注模式"：把大空白变成呼吸感
+   ===================================================================== */
+
+/* 题干卡片：撑起来、居中成焦点 */
+.card.quizq {
+  min-height: 340px; display: flex; flex-direction: column; justify-content: center;
+  padding: 34px 30px; margin-top: 6px;
+  border-radius: 20px;
+  box-shadow: 0 6px 16px rgba(28,35,48,.06), 0 22px 50px rgba(59,109,255,.10);
+  border-color: #e2e9f8;
+}
+.quizq .q {
+  font-size: 27px; font-weight: 900; line-height: 1.5; text-align: center;
+  margin: 0 0 26px; letter-spacing: .2px;
+}
+.quizq .q b, .quizq .q em { color: var(--brand); font-style: normal; }
+
+/* 选项：大一点、居中对齐、每项等宽 */
+.quizq .opts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 13px; }
+.quizq .opt { padding: 20px 18px; font-size: 17.5px; border-radius: 15px; }
+
+/* 反馈区也居中，别左贴 */
+.quizq .sp-fb, .quizq .qz-ex, .quizq .sp-ans { text-align: center; }
+.quizq .qz-ex { background: linear-gradient(180deg, var(--soft), #eef3ff); }
+
+/* 顶部题干信息行：更紧凑、跟卡片贴合 */
+.card.quizq + .actionbar { margin-top: 14px; }
+
+/* 拼写页同理，让输入区成为焦点 */
+.card:has(.sp-inp), .sp-stage { min-height: 300px; }
+
+/* 手机上高度别过高 */
+@media (max-width: 560px) {
+  .card.quizq { min-height: 0; padding: 24px 18px; }
+  .quizq .q { font-size: 21px; margin-bottom: 18px; }
+  .quizq .opt { padding: 16px 14px; font-size: 16px; }
+}
+
+/* =====================================================================
+   美术升级 v6 —— 模块卡"身份化"再精修
+   ===================================================================== */
+
+/* 左侧色条更精致：渐隐收尾，不是硬邦邦一条 */
+.nav-card::before {
+  width: 5px; opacity: 1;
+  background: linear-gradient(180deg, var(--mc, var(--brand)) 0%, var(--mc, var(--brand)) 62%, transparent 100%);
+}
+.nav-card { padding: 20px 18px 16px; gap: 8px; }
+.nav-card:hover { border-color: var(--mc, var(--brand)); }
+.nav-card:hover { box-shadow: 0 6px 14px rgba(28,35,48,.06), 0 20px 44px rgba(28,35,48,.14); }
+
+/* 图标容器：更立体，带高光 */
+.nav-card .nc-chip {
+  width: 52px; height: 52px; border-radius: 16px; font-size: 27px;
+  background: linear-gradient(160deg, #fff 0%, var(--ms, var(--brand2)) 120%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9),
+              inset 0 0 0 1px rgba(255,255,255,.5),
+              0 5px 14px rgba(28,35,48,.10);
+}
+
+/* 标题：加粗、字距收一点 */
+.nav-card .nc-title { font-size: 17.5px; font-weight: 900; letter-spacing: .1px; }
+
+/* 描述：行高舒服，不再顶满 */
+.nav-card .nc-desc { font-size: 12.5px; line-height: 1.65; min-height: 40px; }
+
+/* “进入”做成小胶囊，hover 填充主题色 */
+.nc-go {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; padding: 5px 12px; border-radius: 999px;
+  background: var(--ms, var(--brand2)); 
+  font-size: 12.5px; font-weight: 800;
+  transition: background .18s, color .18s, transform .18s;
+}
+.nav-card:hover .nc-go {
+  background: var(--mc, var(--brand)); color: #fff; transform: translateX(3px); letter-spacing: .3px;
+}
+
+/* ---------- 统计横条：小字换行后不让高度跳动 ---------- */
+.home-stats { align-items: stretch; }
+.home-stats .hs { align-items: flex-start; }
+.home-stats .hs .hs-text { justify-content: center; }
+
+/* ---------- 顶栏：品牌区更醒目 ---------- */
+.top .brand, .brand { letter-spacing: .3px; }
+
+/* ---------- 深色时段：模块卡图标底别太亮 ---------- */
+html[data-theme="night"] .nav-card .nc-chip { background: linear-gradient(160deg, #2a3145, #222940); }
+
+/* =====================================================================
+   美术升级 v7 —— 首页统计条：改竖排布局，彻底解决文字截断
+   ===================================================================== */
+
+/* 每格改为：图标上、数字中、说明下，文字占满整格宽度 */
+.home-stats { grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 10px; }
+.home-stats .hs {
+  flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 14px 14px 12px; min-width: 0;
+}
+.home-stats .hs .hs-ico {
+  width: 38px; height: 38px; border-radius: 11px; font-size: 20px;
+}
+.home-stats .hs .hs-text { width: 100%; gap: 1px; }
+.home-stats .hs .hs-text .big { font-size: 23px; font-weight: 900; line-height: 1.1; }
+.home-stats .hs .hs-text .muted {
+  font-size: 11.5px; line-height: 1.35; color: var(--muted);
+  white-space: normal; overflow: visible; text-overflow: clip;
+}
+/* 中屏 3 列、窄屏 2 列 */
+@media (max-width: 900px) { .home-stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .home-stats { grid-template-columns: repeat(2, 1fr); gap: 5px; }
+  .home-stats .hs { padding: 12px 12px 10px; } }
+
+/* =====================================================================
+   美术升级 v8 —— 介绍/入口卡更有分量，收掉"内容少+空白多"的松散感
+   ===================================================================== */
+
+/* 入口卡（拼句/阅读等 start card）：加一点仪式感 */
+.sent-intro, .card.sent-intro {
+  padding: 30px 28px; border-radius: 20px;
+  background: linear-gradient(150deg, #ffffff 0%, var(--brand2) 160%);
+  border-color: #e2e9f8;
+  box-shadow: 0 6px 16px rgba(28,35,48,.05), 0 20px 46px rgba(59,109,255,.08);
+}
+.sent-intro h3, .card.sent-intro h3 { font-size: 22px; font-weight: 900; margin-bottom: 10px; }
+.sent-intro p { font-size: 14.5px; line-height: 1.9; }
+.sent-intro .btn { margin-top: 16px; padding: 13px 26px; font-size: 15.5px; }
+
+/* 通用卡片头部若有 h3 顶格，给一点强调色左侧竖条 */
+.card h3 { letter-spacing: .2px; }
+
+/* 页面内容整体下压感：标题区与内容间距更舒服 */
+.page-head + .card, .page-head ~ .card:first-of-type { margin-top: 12px; }
+h2:first-child { margin-top: 2px; }
+
+/* 底部说明文字（"今日单词由…"）淡一点，不抢焦点 */
+.wrap > p.muted:last-of-type, .note, .foot-note { opacity: .8; }
