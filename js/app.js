@@ -955,12 +955,15 @@ function bind() {
      数字键 1-4 直接选选项 —— 全程不用碰鼠标 */
   document.onkeydown = (e) => {
     if (e.key === "F5") return;
-    // 拼句打字：Ctrl+1 朗读整句 / Ctrl+; 重打本句（要先于"Ctrl 直接 return"的判断）
+    // 拼句打字：Ctrl+1 朗读 / Ctrl+; 显示答案 / Ctrl+R 重打本句（要先于"Ctrl 直接 return"的判断）
     if (view === "sent" && stList.length && e.ctrlKey) {
       if (e.key === "1" || e.code === "Digit1") {
         e.preventDefault(); safe2(() => speak(stList[stIdx].en), "朗读句子"); return;
       }
       if (e.key === ";" || e.code === "Semicolon") {
+        e.preventDefault(); safe2(showSentAnswer, "显示答案"); return;
+      }
+      if (e.key === "r" || e.key === "R" || e.code === "KeyR") {
         e.preventDefault(); safe2(() => { stDone = []; stFinished = false; stErrThis = 0; render(); }, "重打本句"); return;
       }
       return;
@@ -1009,6 +1012,13 @@ function bind() {
     b.onclick = () => { stDone = []; stFinished = false; stErrThis = 0; render(); });
   document.querySelectorAll("[data-act='stSay']").forEach(b =>
     b.onclick = () => { if (stList.length) speak(stList[stIdx].en); });
+  document.querySelectorAll("[data-act='stHint']").forEach(b =>
+    b.onclick = () => showSentAnswer());
+  document.querySelectorAll("[data-act='stSubmit']").forEach(b =>
+    b.onclick = () => {
+      const inp = $("#stInput");
+      if (inp && stList.length && !stFinished) { submitSentWord(inp); try { inp.focus({ preventScroll: true }); } catch (e) {} }
+    });
 
   // 拼句打字：输入框实时判定（不重渲染，保持焦点）
   const stInp = $("#stInput");
@@ -3693,6 +3703,26 @@ function startSentRound() {
   render();
 }
 
+/* 显示答案：把当前词直接填成卡片（看过答案不算连对、也没有 Perfect 加成） */
+function showSentAnswer() {
+  if (!stList.length || stFinished) return;
+  const s = stList[stIdx];
+  const cur = s.words[stDone.length];
+  if (!cur) return;
+  stDone.push(stDone.length);
+  stCombo = 0; stErrThis++;
+  if (stDone.length >= s.words.length) {
+    stFinished = true;
+    S.stars++;
+    try {
+      if (!Array.isArray(S.sentDone)) S.sentDone = [];
+      if (S.sentDone.indexOf(s.id) < 0) S.sentDone.push(s.id);
+    } catch (e) {}
+    save();
+  }
+  render();
+}
+
 function sentNext() {
   if (!stList.length) return;
   if (stIdx >= stList.length - 1) { stIdx = stList.length; render(); return; }  // 本轮结束
@@ -3751,10 +3781,11 @@ function viewSent() {
     return `
     <div class="card sent-intro">
       <h3>🧩 拼句打字</h3>
-      <p>看<b>中文句子</b>，把英文<b>一个词一个词敲出来</b>。每敲对一个词，它就变成一张彩色卡片，
+      <p>看<b>中文句子</b>和<b>音标提示</b>，把英文<b>一个词一个词敲出来</b>。每敲对一个词，它就变成一张彩色卡片，
       上面标着这个词的<b>句子成分</b>（主语/谓语/宾语…）、<b>音标</b>和<b>意思</b> ——
       一句话拼完，语法结构自然就看懂了。</p>
-      <p class="muted">连着不出错会有 <b>Perfect</b> 加成；整句拼完 +1 ⭐。已解锁 ${doneCnt}/${total} 句。</p>
+      <p class="muted"><b>想不到的词不用怕</b>：随时点下面的「显示答案」先过，看多了自然会。
+      连着不出错有 Perfect 加成；整句拼完 +1 ⭐。已解锁 ${doneCnt}/${total} 句。</p>
       <button class="btn primary" data-act="stStart">开始本轮（8 句）→</button>
     </div>`;
   }
@@ -3786,7 +3817,7 @@ function viewSent() {
     if (i === stDone.length && !stFinished) {
       return `<span class="st-chip st-cur">
         <b class="st-role">${w.role}</b>
-        <i class="st-ipa st-hidden-ipa">?/?</i>
+        <i class="st-ipa">${w.ipa || ""}</i>
         <input id="stInput" class="st-input" autocomplete="off" autocapitalize="off"
                spellcheck="false" placeholder="输入英文" data-act="stinput">
         <span class="st-wcn">${esc(w.cn)}</span>
@@ -3794,6 +3825,15 @@ function viewSent() {
     }
     return "";
   }).join("");
+
+  // 底部按钮栏（句乐部同款：可鼠标点，也可用快捷键）
+  const btnBar = `
+    <div class="st-keys">
+      <button class="st-key" data-act="stSay"><kbd>Ctrl 1</kbd> 播放发音</button>
+      <button class="st-key" data-act="stSubmit"><kbd>Enter</kbd> 提交</button>
+      <button class="st-key" data-act="stHint"><kbd>Ctrl ;</kbd> 显示答案</button>
+      <button class="st-key" data-act="stAgain"><kbd>Ctrl R</kbd> 重打本句</button>
+    </div>`;
 
   return `
   <div class="st-head">
@@ -3810,12 +3850,11 @@ function viewSent() {
       <p class="st-cn-final">${esc(s.cn)}</p>
       <div class="ctrls">
         <button class="btn primary" data-act="stNext">${stIdx >= stList.length - 1 ? "看本轮结果 →" : "下一句 →"}</button>
-        <button class="btn" data-act="stAgain">↻ 再拼一次</button>
-        <button class="btn" data-act="stSay">🔊 听发音</button>
       </div>
     ` : `
       <p class="st-cn">📝 ${esc(s.cn)}</p>
-      <p class="muted st-hint">在输入框敲当前词，<kbd>Enter</kbd> 确认 · <kbd>Ctrl</kbd>+<kbd>1</kbd> 听整句 · <kbd>Ctrl</kbd>+<kbd>;</kbd> 重打</p>
+      <p class="muted st-hint">照着中文和音标敲当前词，<b>想不到就点「显示答案」</b>，先看几遍自然就会了</p>
     `}
+    ${btnBar}
   </div>`;
 }
