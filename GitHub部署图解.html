@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>把网站部署到 GitHub Pages · 图解教程</title>
+<style>
+  body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:760px;margin:0 auto;padding:20px;color:#233;line-height:1.7;background:#f7f9fc}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#667;font-size:13px;margin-bottom:18px}
+  .step{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:16px 18px;margin:14px 0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .num{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:#3b6dff;color:#fff;border-radius:50%;font-weight:700;margin-right:8px}
+  h2{font-size:16px;margin:0 0 10px}
+  svg{display:block;width:100%;height:auto;background:#f1f5fb;border-radius:10px;margin:8px 0}
+  .tip{background:#fff7e6;border-left:4px solid #f0a020;padding:8px 12px;border-radius:0 8px 8px 0;font-size:13px;margin-top:8px}
+  .key{display:inline-block;background:#eef2ff;border:1px solid #cdddff;border-radius:6px;padding:1px 8px;font-weight:700;color:#234}
+  code{background:#eef;padding:1px 6px;border-radius:5px;font-size:13px}
+  .ok{color:#1e8449;font-weight:700}
+</style>
+</head>
+<body>
+<h1>📦 把「英语从零学」部署到 GitHub Pages</h1>
+<div class="sub">不用敲命令、不用装软件，全程在网页上点。跟着 6 步走，最后得到一个手机能直接打开的网址。</div>
+
+<div class="step">
+  <h2><span class="num">1</span>打开 GitHub 并登录</h2>
+  <svg viewBox="0 0 320 90">
+    <rect x="0" y="0" width="320" height="90" rx="8" fill="#f1f5fb"/>
+    <rect x="10" y="14" width="120" height="22" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <text x="18" y="29" font-size="12" fill="#666">🔍 github.com</text>
+    <rect x="210" y="12" width="100" height="26" rx="6" fill="#2da44e"/>
+    <text x="232" y="29" font-size="12" fill="#fff" font-weight="700">Sign up / Log in</text>
+  </svg>
+  <p>浏览器打开 <span class="key">github.com</span>。没有账号就点 <span class="key">Sign up</span> 用邮箱注册一个（免费）。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">2</span>新建一个仓库（Repository）</h2>
+  <svg viewBox="0 0 320 130">
+    <rect x="0" y="0" width="320" height="130" rx="8" fill="#f1f5fb"/>
+    <circle cx="280" cy="22" r="14" fill="#24292f"/><text x="274" y="27" font-size="14" fill="#fff" font-weight="700">+</text>
+    <rect x="14" y="48" width="292" height="70" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="24" y="70" font-size="11" fill="#555">Repository name（仓库名）</text>
+    <rect x="24" y="76" width="200" height="22" rx="5" fill="#eef2ff" stroke="#cdddff"/>
+    <text x="32" y="91" font-size="12" fill="#234" font-weight="700">english-learning</text>
+    <rect x="24" y="106" width="120" height="16" rx="4" fill="#fff" stroke="#cbd5e1"/>
+    <text x="30" y="118" font-size="10" fill="#888">◎ Public（必须选公开）</text>
+  </svg>
+  <p>点右上角 <b>＋</b> → <b>New repository</b>。仓库名填 <code>english-learning</code>，一定选 <span class="key">Public</span>，其它不动，点 <b>Create repository</b>。</p>
+  <div class="tip">Public 是免费的；选 Private 的话 GitHub Pages 要付费，所以选 Public。</div>
+</div>
+
+<div class="step">
+  <h2><span class="num">3</span>把网站文件传上去（直接拖，不用命令）</h2>
+  <svg viewBox="0 0 320 120">
+    <rect x="0" y="0" width="320" height="120" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="16" width="292" height="88" rx="10" fill="#fff" stroke="#3b6dff" stroke-dasharray="6 4"/>
+    <text x="24" y="40" font-size="12" fill="#3b6dff" font-weight="700">把文件拖到这里上传</text>
+    <text x="24" y="62" font-size="11" fill="#777">english-learning 文件夹里的全部内容</text>
+    <text x="24" y="80" font-size="11" fill="#777">（index.html、js/、css/ 等，全选拖进来）</text>
+  </svg>
+  <p>新建仓库后的页面里，点 <b>“uploading an existing file”</b> 那行字，把 <code>english-learning</code> 文件夹里的<b>所有内容</b>一起拖进虚线框。</p>
+  <div class="tip">是拖「文件夹里面的内容」，不是拖整个文件夹本身；确保 <code>index.html</code> 在根目录。</div>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>提交（Commit）</h2>
+  <svg viewBox="0 0 320 80">
+    <rect x="0" y="0" width="320" height="80" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="16" width="292" height="30" rx="6" fill="#fff" stroke="#cbd5e1"/>
+    <text x="22" y="36" font-size="12" fill="#555">提交说明：首次上传网站</text>
+    <rect x="220" y="52" width="86" height="22" rx="6" fill="#2da44e"/>
+    <text x="236" y="68" font-size="11" fill="#fff" font-weight="700">Commit changes</text>
+  </svg>
+  <p>在最下面的说明框随便写点字（比如"首次上传网站"），点绿色的 <b>Commit changes</b>。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">5</span>开启 GitHub Pages</h2>
+  <svg viewBox="0 0 320 120">
+    <rect x="0" y="0" width="320" height="120" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="14" width="100" height="22" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <text x="22" y="29" font-size="11" fill="#555">⚙ Settings</text>
+    <rect x="14" y="50" width="292" height="56" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="24" y="70" font-size="11" fill="#555">① 左侧点 Pages</text>
+    <text x="24" y="88" font-size="11" fill="#555">② Source: main ／ ③ /(root) → Save</text>
+  </svg>
+  <p>进仓库后点顶部的 <b>Settings</b> → 左侧找 <b>Pages</b> → <b>Source</b> 选 <span class="key">main</span> 分支、文件夹选 <span class="key">/(root)</span> → 点 <b>Save</b>。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">6</span>等一两分钟，手机打开网址 🎉</h2>
+  <svg viewBox="0 0 320 70">
+    <rect x="0" y="0" width="320" height="70" rx="8" fill="#f1f5fb"/>
+    <text x="16" y="30" font-size="12" fill="#555">你的网址是：</text>
+    <text x="16" y="52" font-size="13" fill="#234" font-weight="700">https://你的用户名.github.io/english-learning/</text>
+  </svg>
+  <p>保存后等 <b>1～2 分钟</b>，浏览器输入上面的网址即可。<span class="ok">✅ 这是 https 网址，手机直接开，🎤 语音识别也能用。</span></p>
+  <div class="tip">要是打不开，过两分钟再试；首次部署 GitHub 要构建一会儿。</div>
+</div>
+
+<div class="step" style="background:#eef7ff">
+  <h2>💡 以后怎么更新网站？</h2>
+  <p>改完文件后，回到这个仓库，把新文件再拖进去覆盖、点 <b>Commit changes</b> 就行；Pages 会自动重新发布，不用重来。</p>
+</div>
+</body>
+</html>
