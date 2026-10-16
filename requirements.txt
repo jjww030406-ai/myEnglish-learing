@@ -1,0 +1,2 @@
+# 零依赖：本后端仅使用 Python 标准库，无需安装任何第三方包
+# 该文件存在仅为让 Render / Railway 正确识别为 Python 项目
