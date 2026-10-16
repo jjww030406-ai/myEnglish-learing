@@ -5,7 +5,7 @@ const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
   today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
-  phrasals: viewPhrasals, sent: viewSent
+  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -24,7 +24,8 @@ const PAGE_META = {
   review:  { icon: "🔁", title: "每日复习", sub: "复习你学会过的词，每天抽几个防遗忘" },
   calendar:{ icon: "📅", title: "学习日历", sub: "哪天学了、哪天没学，连续打卡一目了然" },
   read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" },
-  sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" }
+  sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" },
+  talk:    { icon: "🗣", title: "情景对话", sub: "选个场景，你一句 AI 一句 —— 它会念给你听，顺手纠正你说得不地道的地方" }
 };
 
 /* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
@@ -444,7 +445,8 @@ function render() {
 
   const labels = {
     home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
-    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法", sent: "🧩 拼句打字"
+    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法", sent: "🧩 拼句打字",
+    talk: "🗣 情景对话"
   };
 
   let body;
@@ -502,6 +504,9 @@ function render() {
   } catch (e) {
     console.error("bind 出错", e);
   }
+  // 对话页：把聊天记录滚到底部，并把光标放回输入框
+  if (view === "talk") { try { setTimeout(talkScroll, 0); } catch (e) {} }
+
   // 动态词源：渲染后填充页面上所有 [data-etym] 占位（运行时从网络抓取，限并发）
   try {
     if (window.Etym) window.Etym.hydrate();
@@ -691,6 +696,64 @@ function bind() {
       Promise.resolve(window.GrammarQuiz.load(true)).then(function () { try { render(); } catch (e) {} });
     }
   };
+
+  // ---------- 情景对话 ----------
+  document.querySelectorAll("[data-tkscene]").forEach(b =>
+    b.onclick = () => { if (window.Talk) { talkInput = ""; window.Talk.setScene(b.dataset.tkscene); render(); } });
+  document.querySelectorAll("[data-tksay]").forEach(b =>
+    b.onclick = () => { const T = window.Talk; if (T) speak(T.state.msgs[+b.dataset.tksay].text); });
+  document.querySelectorAll("[data-tkslow]").forEach(b =>
+    b.onclick = () => { const T = window.Talk; if (T) speak(T.state.msgs[+b.dataset.tkslow].text, true); });
+  document.querySelectorAll("[data-tkhint]").forEach(b =>
+    b.onclick = () => {
+      const el = document.getElementById("tkText");
+      if (el) { el.value = b.dataset.tkhint; talkInput = b.dataset.tkhint; el.focus(); }
+      speak(b.dataset.tkhint);
+    });
+  var tkAuto = document.querySelector("[data-tkauto]");
+  if (tkAuto) tkAuto.onclick = () => { if (window.Talk) { window.Talk.toggleAuto(); render(); } };
+  var tkReset = document.querySelector("[data-tkreset]");
+  if (tkReset) tkReset.onclick = () => { if (window.Talk) { talkInput = ""; window.Talk.reset(); render(); } };
+  var tkSend = document.querySelector("[data-tksend]");
+  if (tkSend) tkSend.onclick = () => talkSend();
+  var tkMic = document.querySelector("[data-tkmic]");
+  if (tkMic) tkMic.onclick = () => {
+    const T = window.Talk;
+    if (!T) return;
+    if (T.state.listening) { T.stopListen(); render(); return; }
+    T.listen(
+      function (txt) {                                  // 边说边把识别结果填进输入框
+        const el = document.getElementById("tkText");
+        if (el) { el.value = txt; talkInput = txt; }
+      },
+      function (finalTxt) {                             // 说完 → 直接发出去
+        const el = document.getElementById("tkText");
+        if (el) { el.value = finalTxt || ""; talkInput = finalTxt || ""; }
+        render();
+        if (String(finalTxt || "").trim()) talkSend();
+      },
+      function (err) {                                  // 没权限 / 不支持 → 提示改用打字
+        T.stopListen();
+        const el = document.getElementById("tkText");
+        if (el) el.placeholder = err === "not-allowed"
+          ? "麦克风没开权限 —— 在浏览器地址栏左边允许一次就能说话了，现在打字也行"
+          : "语音识别没成功，直接打字就好";
+        render();
+      }
+    );
+    render();
+  };
+  var tkText = document.getElementById("tkText");
+  if (tkText) {
+    tkText.oninput = () => { talkInput = tkText.value; };
+    tkText.onkeydown = e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); talkSend(); }
+    };
+    try { if (!window.Talk.state.busy) tkText.focus(); } catch (e) {}
+  }
+
+  document.querySelectorAll("[data-act='gotalk']").forEach(b =>
+    b.onclick = () => goView("talk"));
 
   // 今日达标清单整组都打勾了 → 「再来一组」换下一批词继续加练
   document.querySelectorAll("[data-act='morewords']").forEach(b =>
@@ -1255,6 +1318,7 @@ function viewHome() {
     { v: "etymon",  c: "etymon",  icon: "📖", t: "词源词典", d: "每个单词的故事 · 知道为什么是这个意思，才忘不掉。" },
     { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
+    { v: "talk",    c: "talk",    icon: "🗣", t: "情景对话", d: "选个场景真的跟老外聊：你说一句，AI 接一句并用真人发音念出来，还会纠正你说得不地道的地方。" },
     { v: "phrasals", c: "phrasals", icon: "🔗", t: "用法",   d: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词（look for / get up / turn on…），每个配中文意思 + 例句 + 翻译。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
     { v: "sent",    c: "sent",    icon: "🧩", t: "拼句打字", d: (typeof SENTENCES !== "undefined" ? SENTENCES.length : 0) + " 个日常句子：看中文，逐词敲出英文，拼对的词变成彩色卡片，越连越上瘾。" },
@@ -1359,6 +1423,8 @@ function loadAiPlan() {
   });
 }
 
+var talkInput = "";   // 情景对话输入框的内容（重绘时要保住，不然打一半会被清掉）
+
 /* 自适应难度卡片：把"现在给你定的是什么难度、为什么"摆在首页 */
 function adaptiveBlock() {
   if (!window.Adaptive) return "";
@@ -1366,6 +1432,88 @@ function adaptiveBlock() {
     Adaptive.kick(false);          // 进首页时顺手让 AI 复核一次（内部节流，不会每次都问）
     return Adaptive.block();
   } catch (e) { return ""; }
+}
+
+/* =====================================================================
+   情景对话：你一句，AI 一句（AI 会念出来，还会纠正你说得不地道的地方）
+   和「口语」页的区别：口语页是背现成句子，这里是真的在跟老外聊天。
+   ===================================================================== */
+function viewTalk() {
+  const T = window.Talk;
+  if (!T) return `<div class="card"><p class="muted">对话模块没加载出来，刷新试试。</p></div>`;
+  T.start();
+  const st = T.state;
+  const sc = T.scene();
+
+  const scenes = T.SCENES.map(s =>
+    `<button class="chip ${s.id === st.scene ? "on" : ""}" data-tkscene="${s.id}">${s.icon} ${s.name}</button>`).join("");
+
+  const log = st.msgs.map((m, i) => {
+    if (m.who === "me") {
+      return `<div class="tk-row me"><div class="tk-bub me">${esc(m.text)}</div></div>`;
+    }
+    return `<div class="tk-row ai">
+      <div class="tk-who">${sc.icon} ${esc(sc.who)}</div>
+      <div class="tk-bub ai">
+        <div class="tk-en">${esc(m.text)}</div>
+        <div class="tk-acts">
+          <button class="mini" data-tksay="${i}" title="再听一遍">🔊 听</button>
+          <button class="mini" data-tkslow="${i}" title="慢速再听一遍">🐢 慢速</button>
+        </div>
+        ${m.cn ? `<div class="tk-cn">${esc(m.cn)}</div>` : ""}
+        ${m.better ? `<div class="tk-better"><b>💡 更地道的说法：</b>${esc(m.better)}${m.betterCn ? `<span class="tk-why">${esc(m.betterCn)}</span>` : ""}</div>` : ""}
+        ${(m.hints && m.hints.length) ? `<div class="tk-hints">你可以这样回：${m.hints.map(h => `<button class="mini tk-hint" data-tkhint="${esc(h)}">${esc(h)}</button>`).join("")}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  const errBox = st.err === "no_cloud"
+    ? `<p class="tk-err">⚠️ 没连上云服务，暂时没法对话。联网后刷新页面即可。</p>`
+    : st.err === "no_model" ? `<p class="tk-err">⚠️ 云服务没返回可用模型，稍后再试。</p>`
+    : st.err ? `<p class="tk-err">⚠️ ${esc(st.err)}</p>` : "";
+
+  return `
+  <div class="card talk-card">
+    <div class="tk-head">
+      <div class="tk-scenes">${scenes}</div>
+      <div class="tk-head-r">
+        <button class="mini ${st.autoSpeak ? "on" : ""}" data-tkauto>${st.autoSpeak ? "🔊 自动朗读：开" : "🔇 自动朗读：关"}</button>
+        <button class="mini" data-tkreset>🗑 重新聊</button>
+      </div>
+    </div>
+    <p class="muted">你现在在跟 <b>${esc(sc.who)}</b> 聊天${T.canListen() ? "：可以打字，也可以点 🎤 直接说" : "：直接打字就行"}。说完 AI 会用真人发音回答你，你说得不地道它会顺手告诉你 native 怎么说。</p>
+    ${errBox}
+    <div class="tk-log" id="tkLog">${log || `<div class="tk-empty">点下面的输入框开始聊 👇</div>`}</div>
+    ${st.busy ? `<div class="tk-typing"><span></span><span></span><span></span> ${esc(sc.who)} 正在回你…</div>` : ""}
+    <div class="tk-input">
+      <textarea id="tkText" rows="2" placeholder="Type what you want to say…（比如：Can I get a latte?）" ${st.busy ? "disabled" : ""}>${esc(talkInput)}</textarea>
+      <div class="tk-btns">
+        ${T.canListen() ? `<button class="btn ${st.listening ? "bad" : ""}" data-tkmic>${st.listening ? "🔴 听着呢…（点一下结束）" : "🎤 按住说话"}</button>` : ""}
+        <button class="btn primary" data-tksend ${st.busy ? "disabled" : ""}>${st.busy ? "等一下…" : "发送 →"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+/* 发送：把输入框里的话交给 AI，拿到回复后自动重绘（AI 那句会自动念出来） */
+function talkSend() {
+  const T = window.Talk;
+  const el = document.getElementById("tkText");
+  if (!T || !el) return;
+  const text = String(el.value || "").trim();
+  if (!text) return;
+  talkInput = "";
+  el.value = "";
+  Promise.resolve(T.send(text)).then(function () {
+    try { render(); talkScroll(); } catch (e) {}
+  });
+}
+function talkScroll() {
+  try {
+    const l = document.getElementById("tkLog");
+    if (l) l.scrollTop = l.scrollHeight;
+    const t = document.getElementById("tkText");
+    if (t && !window.Talk.state.busy) t.focus();
+  } catch (e) {}
 }
 
 function aiPlanBlock() {
@@ -2841,7 +2989,15 @@ function viewPhrases() {
     <h3>🏆 ${PHRASES.length} 句口语全部练完了</h3>
     <p class="muted">每一句都标记过「我会了」。想继续就点 🔊 再跟读几遍，保持语感。</p>
   </div>`;
+  // 背句子是"输入"，真开口是"输出" —— 在口语页顶部给对话留一个入口
+  const talkEntry = `
+  <div class="card tipbox talk-entry">
+    <h3>🗣 句子背得差不多了？去真的聊一次</h3>
+    <p class="muted">「情景对话」里选个场景（咖啡店 / 问路 / 面试…），你说一句、AI 接一句，并且<b>用真人发音念给你听</b>；你说得不地道，它顺手告诉你 native 会怎么说。可以打字，也可以点 🎤 直接开口。</p>
+    <button class="btn primary" data-act="gotalk">进入情景对话 →</button>
+  </div>`;
   return `
+  ${talkEntry}
   ${todayBlock}
   <h2>💬 日常口语 ${PHRASES.length} 句　<span class="ph-count">已会 ${phraseDoneCount()} / ${PHRASES.length}</span></h2>
   <p class="muted">这里分两类：<b>🗣 地道说法</b>是 native 在店里、街上、办公室里真会说的（含缩读 gonna / wanna 和高频俚语），<b>📘 基础表达</b>是课本上的规范句。学口语优先练 🗣 那几组。点 🔊 听<b>真人美音</b>，听不清就点 🐢 慢速（0.7 倍速）；<b>觉得自己会说这句了，就点「我会了」</b>，进度记在「我的」里。每句下面的 💡 说明是「什么时候说、为什么这么地道」，别跳过 —— 语法没错但开口很生硬，往往就差这一句提醒。</p>
