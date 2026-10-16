@@ -687,6 +687,12 @@ function bind() {
     b.onclick = () => checkReadFill());
   document.querySelectorAll('[data-act="rdnext"]').forEach(b =>
     b.onclick = () => gotoNextReading());
+  document.querySelectorAll('[data-act="phtest-start"]').forEach(b =>
+    b.onclick = () => startPhrasalTest());
+  document.querySelectorAll("[data-pht]").forEach(b =>
+    b.onclick = () => phTestPick(parseInt(b.dataset.pht)));
+  const phtNext = $("#phtNext");
+  if (phtNext) phtNext.onclick = () => phTestNext();
   document.querySelectorAll('[data-act="rdspeak"]').forEach(b =>
     b.onclick = () => startReadSpeech());
   document.querySelectorAll(".review-start").forEach(b =>
@@ -2255,19 +2261,34 @@ function lessonPage(i) {
 
 /* ---------- 课末测验 ---------- */
 /* 确保某课的作答记录已存在（首次进入时调用） */
+/* 有效测验题：把「用户已答对过的原题」换成云端换题库里的题（按课标题取），实现不重复 */
+function buildEffQuiz(i) {
+  const g = GRAMMAR[i];
+  if (!g) return [];
+  const base = g.quiz || [];
+  const st = gqState[i];
+  const rightSet = (st && st.rightSet) || {};
+  const bank = (window.GQUIZ_BANK && window.GQUIZ_BANK[g.t]) || [];
+  let bi = 0;
+  return base.map(function (q, n) {
+    if (rightSet[n] && bank.length) { const rep = bank[bi % bank.length]; bi++; return rep; }
+    return q;
+  });
+}
 function initGQuiz(i) {
   if (!GRAMMAR[i]) return null;
   if (!gqState[i]) {
-    gqState[i] = { picks: new Array((GRAMMAR[i].quiz || []).length).fill(-1), right: 0, done: false, pastPerfect: false };
+    gqState[i] = { picks: new Array((GRAMMAR[i].quiz || []).length).fill(-1), right: 0, done: false, pastPerfect: false, rightSet: {} };
   }
+  gqState[i].eff = buildEffQuiz(i);   // 每次都重建（应用「答对题→换题」）
   return gqState[i];
 }
 
 function quizBlock(i) {
   const g = GRAMMAR[i];
   if (!g) return "";
-  const quiz = g.quiz || [];
-  const st = gqState[i];
+  const st = gqState[i] || initGQuiz(i) || {};
+  const quiz = (st.eff && st.eff.length) ? st.eff : (g.quiz || []);
   const total = quiz.length;
   const done = st && st.done;
   const allRight = done && st.right === total;
@@ -2340,14 +2361,16 @@ function startGQuiz(i) {
   if (!GRAMMAR[i]) return;
   const old = gqState[i];
   gqState[i] = { picks: new Array((GRAMMAR[i].quiz || []).length).fill(-1), done: false, right: 0,
-                 pastPerfect: old ? old.pastPerfect : false };
+                 pastPerfect: old ? old.pastPerfect : false,
+                 rightSet: (old && old.rightSet) || {} };
+  gqState[i].eff = buildEffQuiz(i);              // 重做时应用「已答对题→换题」
   render();
 }
 /* 点选项 → 立刻判定并显示解析，不用滚到底部点提交 */
 function pickGQuiz(n, k) {
   const st = initGQuiz(gqIdx);
   if (st.done) return;
-  const qz = (GRAMMAR[gqIdx] && GRAMMAR[gqIdx].quiz) || [];
+  const qz = (st.eff && st.eff.length) ? st.eff : ((GRAMMAR[gqIdx] && GRAMMAR[gqIdx].quiz) || []);
   const pick = parseInt(k);
   if (isNaN(pick)) return;
   if (st.picks[n] === pick) return;              // 重复点同一个不重复计分
@@ -2355,7 +2378,7 @@ function pickGQuiz(n, k) {
   if (!q) return;
 
   st.picks[n] = pick;
-  if (pick === q.a) st.right++;                  // 立刻计分
+  if (pick === q.a) { st.right++; st.rightSet[n] = 1; }   // 答对 → 标这个槽位，下次换题
 
   store.set(GQ_KEY, JSON.stringify(gqState));
   save();
@@ -2386,10 +2409,11 @@ function submitGQuiz() {
   if (!g) return;
   const st = initGQuiz(gqIdx);
   if (st.done) return;
+  const quiz = (st.eff && st.eff.length) ? st.eff : (g.quiz || []);
   const left = st.picks.filter(p => p < 0).length;
   if (left > 0) { alert("还有 " + left + " 题没选，答完会自动出成绩。"); return; }
   st.done = true;
-  if (!st.pastPerfect && st.right === (g.quiz || []).length) { S.stars++; st.pastPerfect = true; }
+  if (!st.pastPerfect && st.right === (quiz || []).length) { S.stars++; st.pastPerfect = true; }
   S.todayCount++;
   store.set(GQ_KEY, JSON.stringify(gqState));
   save();
@@ -2598,21 +2622,92 @@ function viewPhrases() {
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
     </div>`).join("")}
   </div>
-  <div class    <div class="card">
+  <div class="card">
       <h3>⚠️ 为什么音标很重要</h3>
       <p class="muted">不标音标的话，你只能按字母猜读法，会读错很多。比如 work 里的 or 读 /ɜːr/ 不读 /ɔːr/，th 读 /θ/ 不读 /t/。照着音标念，一开始就练的是正确发音，这比事后纠正省力得多。</p>
     </div>`;
 }
 /* ---------- 用法 · 短语动词 ---------- */
+/* ---------- 用法测验（不重复：测过的句子换新的） ---------- */
+var phTest = { active: false, list: [], qi: 0, picked: -1, right: 0 };
+function buildPhrasalTest() {
+  const all = [];
+  (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : []).forEach(function (p, pi) {
+    (p.tests || []).forEach(function (t, ti) { all.push({ id: pi + ":" + ti, s: t.s, a: t.a, phrase: p.phrase }); });
+  });
+  const tested = S.phrasalQuiz || [];
+  let pool = all.filter(function (x) { return tested.indexOf(x.id) < 0; });
+  if (pool.length < 6) { S.phrasalQuiz = []; pool = all; }   // 全测过则重置，重新轮一遍
+  return shuffle(pool).slice(0, Math.min(8, pool.length));
+}
+function phTestQuestion(it) {
+  const others = (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : [])
+    .filter(function (p) { return p.phrase !== it.phrase; }).map(function (p) { return p.phrase; });
+  shuffle(others);
+  return shuffle([it.a].concat(others.slice(0, 3)));   // 正确变位 + 3 个别的短语作干扰
+}
+function startPhrasalTest() {
+  const list = buildPhrasalTest();
+  if (!list.length) { alert("暂无可测内容"); return; }
+  phTest = { active: true, list: list, qi: 0, picked: -1, right: 0 };
+  render();
+}
+function phTestPick(k) {
+  if (phTest.picked >= 0) return;
+  const it = phTest.list[phTest.qi];
+  const opts = phTestQuestion(it);
+  phTest.picked = k;
+  if (k === opts.indexOf(it.a)) phTest.right++;
+  S.phrasalQuiz = S.phrasalQuiz || [];
+  if (S.phrasalQuiz.indexOf(it.id) < 0) S.phrasalQuiz.push(it.id);   // 标记已测，下次换别的句子
+  save();
+  render();
+}
+function phTestNext() {
+  if (phTest.qi >= phTest.list.length - 1) {
+    alert("本轮用法测验：答对 " + phTest.right + " / " + phTest.list.length +
+      (phTest.right === phTest.list.length ? "\n🎉 全对！" : "\n已测过的句子下次会自动换成新的。"));
+    phTest.active = false; phTest.list = []; render();
+    return;
+  }
+  phTest.qi++; phTest.picked = -1; render();
+}
+function phrasalTestBlock() {
+  const it = phTest.list[phTest.qi];
+  if (!it) return "";
+  const opts = phTestQuestion(it);
+  const done = phTest.picked >= 0;
+  const ok = done && phTest.picked === opts.indexOf(it.a);
+  return `
+  <div class="card ph-test">
+    <div class="pht-head">🧪 用法测验 · 第 ${phTest.qi + 1} / ${phTest.list.length} 题　已对 ${phTest.right}</div>
+    <p class="pht-q">${it.s.replace("___", '<span class="pht-blank">＿＿＿</span>')}</p>
+    <div class="pht-opts">
+      ${opts.map(function (o, k) {
+        let cls = "btn";
+        if (done) { if (k === opts.indexOf(it.a)) cls += " good"; else if (k === phTest.picked) cls += " bad"; }
+        return `<button class="${cls}" data-pht="${k}" ${done ? "disabled" : ""}>${o}</button>`;
+      }).join("")}
+    </div>
+    ${done ? `<p class="${ok ? "sp-fb good" : "sp-fb bad"}">${ok ? "✅ 答对了！" : "❌ 正确答案：" + it.a}</p>` : ""}
+    ${done ? `<button class="btn primary" id="phtNext">${phTest.qi >= phTest.list.length - 1 ? "看结果 →" : "下一题 →"}</button>` : ""}
+  </div>`;
+}
 function viewPhrasals() {
   const list = (typeof PHRASALVERBS !== "undefined") ? PHRASALVERBS : [];
   if (!list.length) {
     return `<h2>🔗 用法 · 短语动词</h2>
       <div class="card"><p class="muted">用法内容正在从云端加载，稍等片刻或刷新一下。</p></div>`;
   }
+  if (phTest.active) return phrasalTestBlock();
   return `
   <h2>🔗 用法 · 短语动词 ${list.length} 个</h2>
   <p class="muted">英语里很多意思不是靠单个单词，而是「动词 + 小品词」组合表达的——比如 <b>look for</b>（寻找）、<b>get up</b>（起床）、<b>turn on</b>（打开）。这里把最常用的短语动词逐个讲清：中文意思 + 例句 + 翻译，点 🔊 听发音，照着念几遍就记住了。<b>橙色提示</b>是容易踩坑的用法（比如 look forward to 后面接 doing）。</p>
+  <div class="card tipbox">
+    <b>📎 怎么看「后接什么」</b>
+    <p class="muted">每个短语后面标的 <b>sth</b>=接事物、<b>sb</b>=接人、<b>doing</b>=接动名词、<b>不接宾语</b>=不及物。比如 look for 后接 sth（look for sth），look after 后接 sb（look after sb）。</p>
+    <button class="btn primary" data-act="phtest-start">🧪 开始用法测验</button>
+  </div>
   <div class="phrasal-list">
   ${list.map(function (p) {
     const sp = (p.phrase || "").replace(/'/g, "\\'");
@@ -2620,6 +2715,7 @@ function viewPhrasals() {
       <div class="pc-head">
         <span class="pc-phrase">${p.phrase}</span>
         <span class="pc-cn">${p.cn}</span>
+        ${p.pat ? `<span class="pc-pat">后接 ${p.pat}</span>` : ""}
         <button class="mini" onclick="speak('${sp}')">🔊</button>
       </div>
       ${p.ex ? `<div class="pc-ex">
@@ -3287,6 +3383,12 @@ if (window.DailyEngine && window.DailyEngine.loadDailyGrammar) {
 if (window.DailyEngine && window.DailyEngine.loadDailyPhrasals) {
   window.DailyEngine.loadDailyPhrasals().then(function () { render(); }).catch(function (e) {
     console.error("用法动态加载失败：", e);
+  });
+}
+/* 语法测验换题库：云端 __global_gquiz__，用于「答对过的原题→换题」，保证不复重 */
+if (window.DailyEngine && window.DailyEngine.loadDailyGQuiz) {
+  window.DailyEngine.loadDailyGQuiz().then(function () { render(); }).catch(function (e) {
+    console.error("语法换题库加载失败：", e);
   });
 }
 /* 词源同样动态：预载全站共享词源缓存（其他用户抓过的直接复用），
