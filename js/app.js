@@ -629,6 +629,20 @@ function bind() {
   document.querySelectorAll("[data-word]").forEach(b =>
     b.onclick = () => { cardWord = b.dataset.word; goView("cards"); });
 
+  // 语法「每日一练」：选题 / 提交 / 再来一组
+  document.querySelectorAll("[data-gq]").forEach(b =>
+    b.onclick = () => { if (window.GrammarQuiz) { window.GrammarQuiz.pick(+b.dataset.gq, +b.dataset.gk); render(); } });
+  var gqSub = document.querySelector("[data-gqsubmit]");
+  if (gqSub) gqSub.onclick = () => { if (window.GrammarQuiz) { window.GrammarQuiz.submit(); render(); } };
+  var gqAgain = document.querySelector("[data-gqagain]");
+  if (gqAgain) gqAgain.onclick = () => {
+    if (window.GrammarQuiz) {
+      window.GrammarQuiz.again();
+      render();                                   // 先切成「正在出题」
+      Promise.resolve(window.GrammarQuiz.load(true)).then(function () { try { render(); } catch (e) {} });
+    }
+  };
+
   // 今日达标清单整组都打勾了 → 「再来一组」换下一批词继续加练
   document.querySelectorAll("[data-act='morewords']").forEach(b =>
     b.onclick = () => moreDayWords());
@@ -2287,6 +2301,51 @@ function viewEtymon() {
 }
 
 /* ---------- 语法课 ---------- */
+/* ---------- 语法「每日一练」：5 道选择题，题目云端动态生成，答完给答案+解析 ---------- */
+function grammarDailyBlock() {
+  var G = window.GrammarQuiz;
+  if (!G) return "";
+  var st = G.state;
+  if (st.list.length) {
+    var n = G.answered();
+    return `<div class="card gq-card">
+      <div class="gq-head">📝 每日一练 · 语法 5 题 <span class="muted">${G.srcLabel()}</span></div>
+      <p class="muted">${st.checked ? "下面是每题的答案和解析 —— 重点看解析，知道自己为什么错。" : "先做完 5 题，再点「提交答案」，会一次性告诉你每题的对错和解析。"}</p>
+      ${st.list.map(function (q, qi) {
+        var picked = st.picked[qi];
+        var ok = picked === q.a;
+        return `<div class="gq-item">
+          <div class="gq-q">${qi + 1}. ${String(q.q).replace(/＿+|___+/g, '<span class="gq-blank">＿＿</span>')}</div>
+          <div class="gq-opts">
+            ${q.opts.map(function (o, k) {
+              var cls = "btn";
+              if (st.checked) { if (k === q.a) cls += " good"; else if (picked === k) cls += " bad"; }
+              else if (picked === k) cls += " on";
+              return `<button class="${cls}" data-gq="${qi}" data-gk="${k}"${st.checked ? " disabled" : ""}>${"ABCD"[k] || (k + 1)}. ${o}</button>`;
+            }).join("")}
+          </div>
+          ${st.checked ? `<div class="gq-exp ${ok ? "good" : "bad"}">
+            <b>${ok ? "✅ 答对了" : "❌ 你选了 " + ("ABCD"[picked] || "—") + "　正确答案：" + ("ABCD"[q.a] || "—") + ". " + q.opts[q.a]}</b>
+            ${q.e ? `<p>📖 <b>解析</b>：${q.e}</p>` : ""}
+          </div>` : ""}
+        </div>`;
+      }).join("")}
+      <div class="gq-foot">
+        ${st.checked
+          ? `<div class="gq-score">本轮得分 <b>${G.score()}</b> / ${st.list.length}　${G.score() === st.list.length ? "🎉 全对！" : ""}</div>
+             <button class="btn" data-gqagain="1">再来一组 →</button>`
+          : `<button class="btn primary" data-gqsubmit="1"${n < st.list.length ? " disabled" : ""}>提交答案 →</button>
+             <span class="muted">已做 ${n} / ${st.list.length} 题${n < st.list.length ? "，做完才能提交" : ""}</span>`}
+      </div>
+    </div>`;
+  }
+  // 首次进入：异步出题，出完自动重绘
+  if (!st.loading) Promise.resolve(G.load()).then(function () { try { render(); } catch (e) {} });
+  return `<div class="card gq-card">
+    <div class="gq-head">📝 每日一练 · 语法 5 题</div>
+    <p class="muted">🌐 正在按你现在的阶段现出题（大约 20 秒）…</p>
+  </div>`;
+}
 function viewGrammar() {
   if (lessonIdx !== null) return lessonPage(lessonIdx);
   // 今天该学哪节：本阶段安排里第一节还没过的过；本阶段都过了就往后取一节没过的。
@@ -2310,6 +2369,7 @@ function viewGrammar() {
     <b>🏆 ${GRAMMAR.length} 节语法课全部通过</b>
     <p class="muted">每节测验都过了。想巩固可以重开任意一课再看一遍。</p>
   </div>`}
+  ${grammarDailyBlock()}
   <div class="grid2">
   ${GRAMMAR.map((g, i) => {
     const lvl = curStageLevel();
