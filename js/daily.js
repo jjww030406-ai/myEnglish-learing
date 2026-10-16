@@ -278,7 +278,9 @@
   }
   async function loadDailyPhrases() {
     var shared = await sbLoadSharedPhrases();
-    var extra = (typeof PHRASES_EXTRA !== "undefined") ? PHRASES_EXTRA : [];
+    // PHRASES_NATIVE：native 真会说的地道口语（按场景分组），和课文英语一起进库
+    var extra = ((typeof PHRASES_EXTRA !== "undefined") ? PHRASES_EXTRA : [])
+      .concat((typeof PHRASES_NATIVE !== "undefined") ? PHRASES_NATIVE : []);
     applyPhrases(extra, shared);
     // 首次（云端还没存过）把分级语料也写进共享，让其他用户能学到
     if (shared.length === 0 && extra.length) {
