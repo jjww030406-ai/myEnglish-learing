@@ -2481,3 +2481,303 @@ html[data-theme="night"] .nav-card .nc-chip { background: #2F323F; }
 /* 谚语卡在深底上：更清楚的玻璃卡 */
 .hero .hp-quote, .hero blockquote { background: rgba(255,255,255,.12) !important; border: 1px solid rgba(255,255,255,.16) !important; }
 .hero .hp-quote *, .hero blockquote * { color: rgba(255,255,255,.92) !important; }
+
+/* =====================================================================
+   ◆◆◆ 苹果官网风格 · 终极主题 ◆◆◆
+   极简 · 大留白 · 黑白灰克制 · 大字号细字重 · 药丸按钮 · 丝滑细节
+   做法：最末层覆盖，全站切换到 Apple 设计语言。
+   ===================================================================== */
+
+:root {
+  /* —— 苹果色板 —— */
+  --ap-bg:      #FFFFFF;
+  --ap-bg2:     #F5F5F7;      /* 交替分区灰 */
+  --ap-ink:     #1D1D1F;      /* 主文字 · 近黑 */
+  --ap-ink2:    #6E6E73;      /* 次要文字 */
+  --ap-ink3:    #86868B;      /* 三级文字 */
+  --ap-line:    #D2D2D7;      /* 分隔线 */
+  --ap-blue:    #0071E3;      /* 苹果蓝 · 唯一强调色 */
+  --ap-blue-d:  #0077ED;      /* hover 更亮 */
+  --ap-blue-s:  #E8F2FE;
+  --ap-radius:  18px;
+
+  /* 覆盖全站变量 → 整体切换 */
+  --bg: #FFFFFF; --bg2: #F5F5F7; --card: #FFFFFF;
+  --line: #D2D2D7; --soft: #F5F5F7;
+  --txt: #1D1D1F; --muted: #6E6E73;
+  --brand: #0071E3; --brand-d: #0071E3; --brand2: #E8F2FE;
+  --ok: #1D9A63; --bad: #D0021B; --warn: #B7791F;
+  --radius: 18px; --radius-sm: 12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.04);
+  --shadow: 0 4px 18px rgba(0,0,0,.06);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.10);
+  --grad: none; --grad-soft: none;
+
+  /* 苹果字体栈（系统字体优先，中文回落思源/苹方） */
+  --font-head: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+               "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+               "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html, body {
+  background: #FFFFFF;
+  background-image: none !important;
+  font-family: var(--font-body);
+  color: var(--ap-ink);
+  letter-spacing: -.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 各时段天色全部抹平为纯白/浅灰（苹果不分时段换色） */
+html[data-theme="morning"], html[data-theme="afternoon"],
+html[data-theme="evening"], html[data-theme="night"] {
+  --sky-a: #FFFFFF; --sky-b: #F5F5F7;
+  --hero-1: #1D1D1F; --hero-2: #2D2D2F; --hero-3: #3D3D3F;
+  --hero-shadow: rgba(0,0,0,.10);
+}
+html[data-theme="night"] body { background: #FFFFFF; }
+
+/* ---------- 1. 排版：大字号 · 收紧字距 · 层次靠字重 ---------- */
+h1, h2, h3, h4, .hero h1 { font-family: var(--font-head); letter-spacing: -.02em; }
+h1 { font-weight: 700; }
+h2 { font-weight: 600; font-size: 24px; letter-spacing: -.02em; }
+h3 { font-weight: 600; }
+h2::before { display: none; }   /* 去掉彩色竖条，苹果风不装饰 */
+
+/* ---------- 2. 顶栏：极细分割线 · 磨砂玻璃 ---------- */
+.top {
+  width: 100%; margin: 0; border-radius: 0; border: none;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  background: rgba(255,255,255,.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: none;
+  padding: 12px max(22px, calc((100vw - 1040px) / 2));
+  position: sticky; top: 0; z-index: 50;
+}
+.top .brand { font-weight: 600; letter-spacing: -.02em; }
+.top .brand .logo {
+  background: #1D1D1F !important; color: #fff !important;
+  box-shadow: none; border-radius: 9px;
+}
+.top .brand .sub { color: var(--ap-ink2); font-weight: 400; }
+.top button, .nav button {
+  background: transparent; color: var(--ap-ink2); font-weight: 400;
+  border-radius: 980px; font-size: 13.5px;
+}
+.top button:hover, .nav button:hover {
+  background: rgba(0,0,0,.05); color: var(--ap-ink);
+}
+
+/* ---------- 3. Hero：苹果式深黑渐变，纯白大字，无花哨 ---------- */
+.hero {
+  background: #1D1D1F !important;
+  border-radius: 0; margin: 0 calc(50% - 50vw); width: 100vw;
+  padding: 88px 22px 92px;
+  box-shadow: none;
+}
+.hero::before { display: none; }   /* 去掉珊瑚/紫光晕 */
+.hero-inner { max-width: 720px; margin: 0 auto; text-align: center; }
+.hero h1 {
+  color: #F5F5F7 !important; font-weight: 700; letter-spacing: -.025em;
+  font-size: clamp(34px, 6vw, 56px); line-height: 1.08; text-shadow: none;
+}
+.hero p { color: #A1A1A6 !important; font-size: clamp(15px, 2.2vw, 19px); line-height: 1.5; }
+.hero p b { color: #F5F5F7 !important; border-bottom: none !important; }
+/* 顶部小徽标：苹果那行"新品"文字 */
+.hero-pill {
+  background: transparent !important; border: none !important;
+  color: #F5A623; font-weight: 600; font-size: 15px; letter-spacing: -.01em;
+}
+.hero-goal {
+  background: transparent !important; color: #A1A1A6 !important;
+  border: none !important; box-shadow: none; font-size: 15px;
+}
+.hero-goal .muted { color: #86868B !important; }
+/* 谚语卡：苹果式灰色分区块 */
+.hero .hp-quote, .hero blockquote {
+  background: #2D2D2F !important; border: none !important; color: #F5F5F7 !important;
+  border-radius: 18px;
+}
+.hero .hp-quote *, .hero blockquote * { color: #F5F5F7 !important; }
+.hero-glow, .hero-spark { display: none; }
+
+/* ---------- 4. 按钮：苹果药丸按钮（实心蓝 / 描边） ---------- */
+.btn {
+  border-radius: 980px; font-weight: 400; font-size: 15px;
+  padding: 13px 26px; letter-spacing: -.01em;
+  transition: background .2s, color .2s, transform .2s;
+}
+.btn.primary, .hero .btn.primary {
+  background: var(--ap-blue) !important; color: #fff !important;
+  box-shadow: none !important; font-weight: 400;
+}
+.btn.primary:hover, .hero .btn.primary:hover {
+  background: var(--ap-blue-d) !important; transform: none;
+}
+.btn:not(.primary) {
+  background: transparent !important; color: var(--ap-blue) !important;
+  border: 1px solid var(--ap-blue) !important; box-shadow: none !important;
+}
+.btn:not(.primary):hover { background: var(--ap-blue) !important; color: #fff !important; }
+
+/* ---------- 5. 卡片：极简白卡 · 几乎无阴影 ---------- */
+.card {
+  background: #FFFFFF; border: 1px solid #E8E8ED; border-radius: var(--ap-radius);
+  box-shadow: none; transition: box-shadow .3s, transform .3s;
+}
+.card:hover { box-shadow: 0 8px 30px rgba(0,0,0,.06); transform: none; }
+
+/* ---------- 6. 首页统计条：苹果式极简数字块 ---------- */
+.home-stats {
+  background: #FFFFFF; border: 1px solid #E8E8ED; border-radius: var(--ap-radius);
+  box-shadow: none; padding: 8px; gap: 0;
+}
+.home-stats .hs { border-radius: 12px; }
+.home-stats .hs:hover { background: #F5F5F7; transform: none; }
+.home-stats .hs .big { font-weight: 600; letter-spacing: -.03em; color: var(--ap-ink); }
+.home-stats .hs .muted { color: var(--ap-ink2); }
+.hs-ico, .home-stats .hs .hs-ico {
+  background: transparent !important; box-shadow: none; font-size: 20px;
+}
+
+/* ---------- 7. 模块卡：苹果产品网格卡 ---------- */
+.nav-card {
+  background: #FFFFFF; border: 1px solid #E8E8ED; border-radius: var(--ap-radius);
+  box-shadow: none; transition: background .2s, border-color .2s;
+}
+.nav-card:hover { transform: none; background: #FAFAFC; border-color: #D2D2D7; box-shadow: none; }
+.nav-card .nc-chip {
+  background: #F5F5F7 !important; box-shadow: none !important; border-radius: 14px;
+}
+.nav-card .nc-title { font-weight: 600; font-size: 17px; letter-spacing: -.02em; }
+.nav-card .nc-desc { color: var(--ap-ink2); }
+.nc-go { color: var(--ap-blue) !important; font-weight: 400; }
+.nc-go::after { content: " ›" !important; }
+.nav-card:hover .nc-go { color: var(--ap-blue-d) !important; }
+
+/* ---------- 8. 测验/选项：苹果列表式 ---------- */
+.opt {
+  background: #FFFFFF; border: 1px solid #D2D2D7; border-radius: 12px;
+  font-weight: 400; color: var(--ap-ink);
+  transition: border-color .2s, background .2s;
+}
+.opt:hover:not(:disabled) {
+  border-color: var(--ap-ink); background: #FFFFFF; color: var(--ap-ink);
+  transform: none; box-shadow: none;
+}
+.opt.right { background: #FFFFFF !important; border-color: #1D9A63 !important; color: #1D9A63 !important; }
+.opt.wrong { background: #FFFFFF !important; border-color: #D0021B !important; color: #D0021B !important; }
+.card.quizq, .quizq .q { background: #FFFFFF; box-shadow: none; }
+.quizq .q { font-weight: 600; letter-spacing: -.02em; color: var(--ap-ink); }
+
+/* ---------- 9. 进度条：极细苹果式 ---------- */
+.bar { height: 4px; background: #E8E8ED; box-shadow: none; }
+.bar i { background: var(--ap-blue) !important; box-shadow: none; }
+
+/* ---------- 10. 页眉：极简，去掉软色 ---------- */
+.page-head {
+  background: transparent; border: none; border-bottom: 1px solid #E8E8ED;
+  border-radius: 0; box-shadow: none; padding: 4px 0 18px;
+}
+.page-head h3 { font-weight: 600; letter-spacing: -.02em; color: var(--ap-ink); }
+
+/* ---------- 11. 输入框：细描边，聚焦蓝 ---------- */
+input, textarea, select {
+  border: 1px solid #D2D2D7; border-radius: 12px; background: #FFFFFF;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--ap-blue); box-shadow: 0 0 0 3px rgba(0,113,227,.15);
+}
+
+/* ---------- 12. 拼句卡片：去掉彩色成分，简化为灰阶 + 单一蓝 ---------- */
+.st-chip { border-radius: 14px; border-width: 1px !important; background: #FFFFFF !important; }
+.st-role { background: var(--ap-ink) !important; }
+.st-subj .st-role, .st-pred .st-role, .st-obj .st-role,
+.st-attr .st-role, .st-adv .st-role, .st-comp .st-role, .st-other .st-role {
+  background: var(--ap-ink2) !important;
+}
+.st-subj .st-w, .st-pred .st-w, .st-obj .st-w, .st-attr .st-w,
+.st-adv .st-w, .st-comp .st-w { color: var(--ap-ink) !important; }
+.st-subj, .st-pred, .st-obj, .st-attr, .st-adv, .st-comp { border-color: #E8E8ED !important; }
+.st-input { border-bottom-color: var(--ap-blue); }
+.st-perfect { background: none !important; color: var(--ap-ink) !important; -webkit-text-fill-color: var(--ap-ink); }
+.st-key { border-radius: 980px; }
+.st-key:hover { border-color: var(--ap-ink); color: var(--ap-ink); }
+
+/* ---------- 13. 页脚：极简灰字 ---------- */
+footer { background: transparent; border-top: 1px solid #E8E8ED; color: var(--ap-ink3); }
+
+/* ---------- 14. 动效：苹果式克制淡入 ---------- */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.hero, .home-stats, .card, .step, .ai-plan, .page-head, .mode, .nav-grid > .nav-card {
+  animation: fadeUp .7s cubic-bezier(.22,1,.36,1) backwards;
+}
+
+/* ---------- 苹果风精修：抹掉残留彩色，统一灰阶 ---------- */
+.hero-pill { color: #86868B !important; }
+.hero-goal { color: #86868B !important; }
+
+/* 统计条图标：去彩色，纯灰阶（苹果不铺彩色块） */
+.home-stats .hs .hs-ico,
+.home-stats .hs-mastered .hs-ico,
+.home-stats .hs-learned .hs-ico,
+.home-stats .hs-days .hs-ico,
+.home-stats .hs-stars .hs-ico,
+.home-stats .hs-total .hs-ico { background: transparent !important; }
+
+/* 每日一词横幅：苹果式浅灰条 */
+.daily-banner, .nowarn {
+  background: #F5F5F7 !important; border: none !important; border-radius: 12px;
+  color: var(--ap-ink2);
+}
+.daily-banner b, .nowarn b { color: var(--ap-ink); }
+
+/* AI 计划卡：苹果式白卡 */
+.ai-plan { background: #FFFFFF !important; border: 1px solid #E8E8ED !important; box-shadow: none !important; }
+
+/* 首页底部建议顺序卡：去渐变 */
+.home-guide { background: #F5F5F7 !important; border: none !important; }
+
+/* 各功能内页的分区卡：灰底替代软色 */
+.step { background: #F5F5F7; border: none; }
+.step::before { display: none; }
+.step b { color: var(--ap-ink); }
+.step:hover { transform: none; box-shadow: none; background: #EFEFF2; }
+
+/* ---------- 苹果风精修 2：顶栏胶囊 → 极简文字链接 ---------- */
+.top .chips { gap: 4px; }
+.top .chip, .top .chips button {
+  background: transparent !important; border: none !important;
+  color: var(--ap-ink2) !important; box-shadow: none !important;
+  font-weight: 400 !important; font-size: 13.5px;
+  padding: 8px 12px; border-radius: 980px;
+  transition: color .2s, background .2s;
+}
+.top .chip:hover, .top .chips button:hover {
+  color: var(--ap-ink) !important; background: rgba(0,0,0,.05) !important;
+}
+/* 连续打卡火苗颜色统一灰 */
+.chip-fire { color: var(--ap-ink2) !important; }
+
+/* ---------- 苹果风精修 3：页眉返回按钮 + 图标胶囊 → 极简 ---------- */
+.page-head .ph-chip,
+.page-head.ph-spell .ph-chip, .page-head.ph-cards .ph-chip,
+.page-head.ph-etymon .ph-chip, .page-head.ph-grammar .ph-chip,
+.page-head.ph-phrases .ph-chip, .page-head.ph-quiz .ph-chip,
+.page-head.ph-me .ph-chip, .page-head.ph-today .ph-chip {
+  background: #F5F5F7 !important; box-shadow: none;
+}
+/* “← 返回首页”按钮 */
+.page-head button, .page-head .btn {
+  background: transparent !important; color: var(--ap-blue) !important;
+  border: none !important; font-weight: 400; padding: 6px 0;
+}
+.page-head button:hover, .page-head .btn:hover { color: var(--ap-blue-d) !important; text-decoration: underline; }
+
+/* 学习阶段/已掌握 的苹果蓝数字 */
+.page-head + * .big, .stage-num, .mst-num { color: var(--ap-ink); }
+
+/* 熟练度进度条：苹果极细灰条 + 蓝填充 */
+.mastery-bar, .mbar { background: #E8E8ED; }
