@@ -4,7 +4,8 @@ const app = $("#app");
 const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
-  today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead
+  today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
+  phrasals: viewPhrasals
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -15,6 +16,7 @@ const PAGE_META = {
   etymon:  { icon: "📖", title: "词源词典", sub: "每个单词的故事 · 知道为什么是这个意思，才记得牢" },
   grammar: { icon: "📚", title: "语法课",   sub: GRAMMAR.length + " 节零基础语法，每节配自测" },
   phrases: { icon: "💬", title: "口语",     sub: PHRASES.length + " 句日常口语，每句讲清用法" },
+  phrasals:{ icon: "🔗", title: "用法",     sub: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词，每个配例句" },
   quiz:    { icon: "✍️", title: "测验",     sub: "每轮从词库随机抽取 10 题，不固定" },
   me:      { icon: "📈", title: "我的",     sub: "学习记录、星星、打卡与错词本" },
   today:   { icon: "📅", title: "今日任务", sub: "今天该学哪些词、哪些句子，哪些还没学" },
@@ -397,7 +399,7 @@ function render() {
 
   const labels = {
     home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
-    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读"
+    grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法"
   };
 
   let body;
@@ -1101,6 +1103,7 @@ function viewHome() {
     { v: "etymon",  c: "etymon",  icon: "📖", t: "词源词典", d: "每个单词的故事 · 知道为什么是这个意思，才忘不掉。" },
     { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
+    { v: "phrasals", c: "phrasals", icon: "🔗", t: "用法",   d: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词（look for / get up / turn on…），每个配中文意思 + 例句 + 翻译。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
     { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "每轮从你当前的词库随机抽 10 题（中→英 / 英→中随机），做完自动换一批，不固定。" },
     { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" }
@@ -2595,9 +2598,38 @@ function viewPhrases() {
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
     </div>`).join("")}
   </div>
-  <div class="card">
-    <h3>⚠️ 为什么音标很重要</h3>
-    <p class="muted">不标音标的话，你只能按字母猜读法，会读错很多。比如 work 里的 or 读 /ɜːr/ 不读 /ɔːr/，th 读 /θ/ 不读 /t/。照着音标念，一开始就练的是正确发音，这比事后纠正省力得多。</p>
+  <div class    <div class="card">
+      <h3>⚠️ 为什么音标很重要</h3>
+      <p class="muted">不标音标的话，你只能按字母猜读法，会读错很多。比如 work 里的 or 读 /ɜːr/ 不读 /ɔːr/，th 读 /θ/ 不读 /t/。照着音标念，一开始就练的是正确发音，这比事后纠正省力得多。</p>
+    </div>`;
+}
+/* ---------- 用法 · 短语动词 ---------- */
+function viewPhrasals() {
+  const list = (typeof PHRASALVERBS !== "undefined") ? PHRASALVERBS : [];
+  if (!list.length) {
+    return `<h2>🔗 用法 · 短语动词</h2>
+      <div class="card"><p class="muted">用法内容正在从云端加载，稍等片刻或刷新一下。</p></div>`;
+  }
+  return `
+  <h2>🔗 用法 · 短语动词 ${list.length} 个</h2>
+  <p class="muted">英语里很多意思不是靠单个单词，而是「动词 + 小品词」组合表达的——比如 <b>look for</b>（寻找）、<b>get up</b>（起床）、<b>turn on</b>（打开）。这里把最常用的短语动词逐个讲清：中文意思 + 例句 + 翻译，点 🔊 听发音，照着念几遍就记住了。<b>橙色提示</b>是容易踩坑的用法（比如 look forward to 后面接 doing）。</p>
+  <div class="phrasal-list">
+  ${list.map(function (p) {
+    const sp = (p.phrase || "").replace(/'/g, "\\'");
+    return `<div class="card phrasal-card">
+      <div class="pc-head">
+        <span class="pc-phrase">${p.phrase}</span>
+        <span class="pc-cn">${p.cn}</span>
+        <button class="mini" onclick="speak('${sp}')">🔊</button>
+      </div>
+      ${p.ex ? `<div class="pc-ex">
+        <span class="pc-ex-en">${p.ex}</span>
+        <button class="mini" onclick="speak('${p.ex.replace(/'/g, "\\'")}')">🔊</button>
+        <span class="pc-ex-cn">${p.exCn || ""}</span>
+      </div>` : ""}
+      ${p.note ? `<p class="muted pc-note">💡 ${p.note}</p>` : ""}
+    </div>`;
+  }).join("")}
   </div>`;
 }
 function speak(t) {
@@ -3249,6 +3281,12 @@ if (window.DailyEngine && window.DailyEngine.loadDailyReading) {
 if (window.DailyEngine && window.DailyEngine.loadDailyGrammar) {
   window.DailyEngine.loadDailyGrammar().then(function () { render(); }).catch(function (e) {
     console.error("语法动态加载失败：", e);
+  });
+}
+/* 用法（短语动词）同样动态装配：基础种子 + 云端共享 __global_phrasals__，可随时增删、不写死 */
+if (window.DailyEngine && window.DailyEngine.loadDailyPhrasals) {
+  window.DailyEngine.loadDailyPhrasals().then(function () { render(); }).catch(function (e) {
+    console.error("用法动态加载失败：", e);
   });
 }
 /* 词源同样动态：预载全站共享词源缓存（其他用户抓过的直接复用），
