@@ -426,7 +426,10 @@ function render() {
   // 功能页则留白，最上面就是「← 返回首页」，不再有第二条横栏。
   const top = view === "home" ? `
     <header class="top">
-      <div class="brand"><span class="logo">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
+      <div class="brand-row">
+        <div class="brand"><span class="logo">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
+        ${libBadge()}
+      </div>
       <div class="chips">
         <button class="chip chip-me" data-chip="me" title="查看我的学习记录">👤 ${curProfile().name} ›</button>
         <button class="chip chip-star" data-chip="me" title="⭐ 星星：每完成一轮「今日目标」（例如今天练满 ${dailyGoal} 个词、或做完一次语法自测）就 +1 颗，用来记录你的努力。点开看「我的」页了解详情">⭐ 星星 ${S.stars}</button>
@@ -467,7 +470,21 @@ function render() {
   }
 }
 
-/* 每日单词状态横幅（联网获取中 / 已就绪 / 离线回落） */
+/* 词库条数徽章：统一显示在顶栏「英语从零学」后面，其他位置不再重复显示这个词库信息。
+   加载中/离线状态也在这里体现，所以去掉每日横幅也不会丢信息。 */
+function libBadge() {
+  const n = (typeof WORDS !== "undefined" ? WORDS.length : 0);
+  const i = window.DAILY_INFO || {};
+  let cls = "ok", tail = n + " 词", tip = "词库现在共 " + n + " 个单词，每天自动补充新词";
+  if (i.status === "loading") {
+    cls = "loading"; tail = "补充中…"; tip = "正在联网补充今日新词";
+  } else if (i.status === "offline" || i.status === "local") {
+    cls = "offline"; tail = n + " 词 · 本地"; tip = "当前离线，用的是本机内置词库；联网后会自动补充新词";
+  }
+  return `<span class="brand-lib lib-${cls}" title="${tip}">📚 词库 <b>${tail}</b></span>`;
+}
+
+/* 每日单词状态横幅：状态已并入顶栏的「词库」徽章，这里不再单独显示 */
 /* ---------- 吉祥物互动 ----------
    点一下猫头鹰：蹦一下 + 弹出一句话。话不是写死的，按「当前时段 + 你的进度」挑，
    所以早中晚、有没有错题、今天练没练够，说的内容都不一样。 */
@@ -565,9 +582,7 @@ function timeOfDay(h) {
 }
 
 function dailyBanner() {
-  const i = window.DAILY_INFO || {};
-  if (!i.text) return "";
-  return `<div class="daily-banner ${i.status || ""}">${i.text}</div>`;
+  return "";   // 词库状态统一放顶栏徽章（libBadge），不再占用一条横幅
 }
 
 /* 有内容才渲染小节，避免大模型偶尔漏字段时屏幕上出现「undefined」 */
@@ -1735,7 +1750,7 @@ function viewCards() {
   curCard = WORDS[currentWordIndex()];
   const w = curCard;
   return `
-  <h2>单词卡 · 共 ${WORDS.length} 个</h2>
+  <h2>单词卡</h2>
   <p class="muted">意思、例句、句意、词源全部直接显示，不用点任何按钮。</p>
 
   <!-- 单词主体 + 词性 + 意思 + 单复数 + 例句，全在同一个块里 -->
