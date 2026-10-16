@@ -12,10 +12,11 @@ Supabase 的 __global_phrasals__。站点运行时自动拉取，全站立刻生
     python3 build_phrasals.py dry  --count 5        # 预览将生成的 JSON（不写云端）
     python3 build_phrasals.py apply --count 50      # 调 AI 生成并写入云端
 
-配置（环境变量，二选一）：
-    A. 直连 OpenAI 兼容：
+配置（环境变量，均可选；默认已走免费免 key 端点，什么都不设也能跑）：
+    A. 默认（零配置）：BlockRun 免 key 匿名通道，直接 python3 build_phrasals.py apply
+    B. 直连你自己的 OpenAI 兼容 key：
        AI_API_KEY=sk-xxx  AI_BASE_URL=https://api.openai.com/v1  AI_MODEL=gpt-4o-mini
-    B. 走你的 Python 后端（key 只存后端，更隐私）：
+    C. 走你的 Python 后端（key 只存后端，更隐私）：
        BACKEND=https://english-learning-backend.onrender.com
     云端（默认用站点同款，一般不用改）：
        SUPABASE_URL / SUPABASE_ANON_KEY
@@ -37,9 +38,12 @@ SUPABASE_ANON_KEY = os.environ.get(
     "SUPABASE_ANON_KEY", "sb_publishable_2m6HQqQtZ06CHVfvf7hloA_EhFp6khq")
 PHRASALS_KEY = "__global_phrasals__"
 
-AI_API_KEY = os.environ.get("AI_API_KEY", "")
-AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-AI_MODEL = os.environ.get("AI_MODEL", "gpt-4o-mini")
+# 默认走免费免 key 端点（BlockRun 的 OpenAI 兼容匿名通道），零配置即可用。
+# 想换自己的 key：export AI_API_KEY=sk-xxx AI_BASE_URL=https://api.openai.com/v1
+# 想走自建后端（key 只存后端）：export BACKEND=https://你的-python主机
+AI_API_KEY = os.environ.get("AI_API_KEY", "not-needed")
+AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://blockrun.ai/api/v1").rstrip("/")
+AI_MODEL = os.environ.get("AI_MODEL", "nvidia/nemotron-3.5-lightning")
 BACKEND = os.environ.get("BACKEND", "").rstrip("/")
 
 UA = {"User-Agent": "Mozilla/5.0 (compatible; EnglishSiteBot/1.0)"}
@@ -200,13 +204,19 @@ def normalize(item, phrase):
 
 def gen_batch(phrases):
     user = "请为以下短语动词生成词库条目：\n" + "\n".join("- " + p for p in phrases)
-    text, err = ai_chat(SYSTEM, user)
-    if err:
-        return None, err
-    arr = extract_json_array(text)
-    if not arr:
-        return None, "AI 未返回可解析 JSON：" + (text or "")[:200]
-    return arr, None
+    last_err = ""
+    for attempt in range(3):                       # 免费端点偶发限流，重试
+        text, err = ai_chat(SYSTEM, user)
+        if err:
+            last_err = err
+            time.sleep(3)
+            continue
+        arr = extract_json_array(text)
+        if arr:
+            return arr, None
+        last_err = "AI 未返回可解析 JSON：" + (text or "")[:200]
+        time.sleep(2)
+    return None, last_err
 
 
 # ---------------- CLI ----------------
