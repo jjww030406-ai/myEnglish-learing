@@ -453,7 +453,7 @@
       if (!r.ok) return [];
       var rows = await r.json();
       var arr = (rows && rows[0] && rows[0].data && rows[0].data.phrasals) || [];
-      return arr.map(function (x) { return { phrase: x.phrase, cn: x.cn || "", ex: x.ex || "", exCn: x.exCn || "", level: x.level || 1, note: x.note || "" }; });
+      return arr.map(function (x) { return { phrase: x.phrase, cn: x.cn || "", ex: x.ex || "", exCn: x.exCn || "", level: x.level || 1, note: x.note || "", pat: x.pat || "", tests: x.tests || [] }; });
     } catch (e) { return []; }
   }
   async function sbUpsertPhrasals(arr) {
@@ -489,9 +489,29 @@
     return PHRASALVERBS;
   }
 
+  /* ---------------- 语法测验题库（__global_gquiz__）：云端动态提供，可随时增删 ----------------
+     每节课除了自带 quiz，还可以在云端放「换题库」：用户答对过的原题会被这里的题替换掉，
+     这样重做时不会一直看到同一道已会的题。键用「课标题」保证顺序变动也不错位。 */
+  var SHARED_GQUIZ_KEY = "__global_gquiz__";
+  window.GQUIZ_BANK = window.GQUIZ_BANK || {};   // { "第1课：be 动词…": [ {q,opts,a,e}, … ] }（云端动态提供）
+  async function sbLoadSharedGQuiz() {
+    if (!SYNC.enabled || !SYNC.url) return {};
+    try {
+      var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_GQUIZ_KEY + "&select=data", { headers: sbHeaders() });
+      if (!r.ok) return {};
+      var rows = await r.json();
+      var d = (rows && rows[0] && rows[0].data) || {};
+      return d.bank || {};
+    } catch (e) { return {}; }
+  }
+  async function loadDailyGQuiz() {
+    window.GQUIZ_BANK = await sbLoadSharedGQuiz();
+    return window.GQUIZ_BANK;
+  }
+
   window.DailyEngine = {
     loadDailyWords: loadDailyWords, loadDailyPhrases: loadDailyPhrases,
-    loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar, loadDailyPhrasals: loadDailyPhrasals,
+    loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar, loadDailyPhrasals: loadDailyPhrasals, loadDailyGQuiz: loadDailyGQuiz,
     pickDaily: pickDaily, extractJSON: extractJSON,
     localDateStr: localDateStr, fetchDict: fetchDict, genCn: genCn,
     applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar, applyPhrasals: applyPhrasals
