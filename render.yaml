@@ -1,0 +1,21 @@
+# Render 一键部署配置
+# 用法：在仓库页面点「Deploy to Render」按钮，或访问
+# https://render.com/deploy?repo=https://github.com/jjww030406-ai/myEnglish-learing
+services:
+  - type: web
+    name: english-learning-backend
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python server.py"
+    healthCheckPath: /api/health
+    envVars:
+      - key: AI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: AI_MODEL
+        value: gpt-4o-mini
+      - key: ALLOW_ORIGIN        # 填你的网站域名，如 https://jjww.new.tg
+        sync: false
+      - key: AI_API_KEY          # 填你的 OpenAI / 兼容服务 key（只存服务端）
+        sync: false
