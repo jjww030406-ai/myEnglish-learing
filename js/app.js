@@ -2693,6 +2693,18 @@ function phrasalTestBlock() {
     ${done ? `<button class="btn primary" id="phtNext">${phTest.qi >= phTest.list.length - 1 ? "看结果 →" : "下一题 →"}</button>` : ""}
   </div>`;
 }
+/* 按 pat 生成「后面接什么」的说明（和 note 一样的 💡 橙色样式，不用小标签） */
+function phPatNote(p) {
+  const map = {
+    "sth":         "宾语放后面：" + p.phrase + " sth（后面接事物）",
+    "sb":          "宾语放后面：" + p.phrase + " sb（后面接人）",
+    "sb/sth":      "宾语放后面：" + p.phrase + " sb / sth（后面接人或事物）",
+    "doing":       p.phrase + " 后面接 doing（动词 -ing 形式）",
+    "sth / doing": p.phrase + " 后面接 sth（事物）或 doing（动词-ing）",
+    "不接宾语":     p.phrase + " 不接宾语，后面直接跟时间、地点等成分"
+  };
+  return map[p.pat] || "";
+}
 function viewPhrasals() {
   const list = (typeof PHRASALVERBS !== "undefined") ? PHRASALVERBS : [];
   if (!list.length) {
@@ -2702,20 +2714,18 @@ function viewPhrasals() {
   if (phTest.active) return phrasalTestBlock();
   return `
   <h2>🔗 用法 · 短语动词 ${list.length} 个</h2>
-  <p class="muted">英语里很多意思不是靠单个单词，而是「动词 + 小品词」组合表达的——比如 <b>look for</b>（寻找）、<b>get up</b>（起床）、<b>turn on</b>（打开）。这里把最常用的短语动词逐个讲清：中文意思 + 例句 + 翻译，点 🔊 听发音，照着念几遍就记住了。<b>橙色提示</b>是容易踩坑的用法（比如 look forward to 后面接 doing）。</p>
+  <p class="muted">英语里很多意思不是靠单个单词，而是「动词 + 小品词」组合表达的——比如 <b>look for</b>（寻找）、<b>get up</b>（起床）、<b>turn on</b>（打开）。这里把最常用的短语动词逐个讲清：中文意思 + 例句 + 翻译，点 🔊 听发音，照着念几遍就记住了。<b>橙色提示</b>告诉你后面接什么、怎么变位。</p>
   <div class="card tipbox">
-    <b>📎 怎么看「后接什么」</b>
-    <p class="muted">每个短语后面标的 <b>sth</b>=接事物、<b>sb</b>=接人、<b>doing</b>=接动名词、<b>不接宾语</b>=不及物。比如 look for 后接 sth（look for sth），look after 后接 sb（look after sb）。</p>
     <button class="btn primary" data-act="phtest-start">🧪 开始用法测验</button>
   </div>
   <div class="phrasal-list">
   ${list.map(function (p) {
     const sp = (p.phrase || "").replace(/'/g, "\\'");
+    const tip = p.note || phPatNote(p);
     return `<div class="card phrasal-card">
       <div class="pc-head">
         <span class="pc-phrase">${p.phrase}</span>
         <span class="pc-cn">${p.cn}</span>
-        ${p.pat ? `<span class="pc-pat">后接 ${p.pat}</span>` : ""}
         <button class="mini" onclick="speak('${sp}')">🔊</button>
       </div>
       ${p.ex ? `<div class="pc-ex">
@@ -2723,7 +2733,7 @@ function viewPhrasals() {
         <button class="mini" onclick="speak('${p.ex.replace(/'/g, "\\'")}')">🔊</button>
         <span class="pc-ex-cn">${p.exCn || ""}</span>
       </div>` : ""}
-      ${p.note ? `<p class="muted pc-note">💡 ${p.note}</p>` : ""}
+      ${tip ? `<p class="muted pc-note">💡 ${tip}</p>` : ""}
     </div>`;
   }).join("")}
   </div>`;
