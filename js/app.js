@@ -426,7 +426,7 @@ function render() {
   // 功能页则留白，最上面就是「← 返回首页」，不再有第二条横栏。
   const top = view === "home" ? `
     <header class="top">
-      <div class="brand">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></div>
+      <div class="brand"><span class="logo">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
       <div class="chips">
         <button class="chip chip-me" data-chip="me" title="查看我的学习记录">👤 ${curProfile().name} ›</button>
         <button class="chip chip-star" data-chip="me" title="⭐ 星星：每完成一轮「今日目标」（例如今天练满 ${dailyGoal} 个词、或做完一次语法自测）就 +1 颗，用来记录你的努力。点开看「我的」页了解详情">⭐ 星星 ${S.stars}</button>
