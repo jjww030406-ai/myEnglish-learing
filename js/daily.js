@@ -12,6 +12,12 @@
 (function () {
   "use strict";
 
+  /* ⚠️ 必须在任何地方改写 WORDS 之前先留一份底稿。
+     下面 applyWords() 会用「云端共享词 + 本地生成词」重写全局 WORDS，
+     如果不在这里快照，data.js 里人工编写的 253 个零基础词（带音标/例句/词根/解析）
+     就会永远进不了词库 —— 用户学到的只剩下按词频现抓的词。 */
+  var BASE_WORDS = (typeof WORDS !== "undefined" && WORDS.length) ? WORDS.slice() : [];
+
   var CFG = window.CLOUD_CONFIG || {};
   var SYNC = CFG.sync || {};
   var cloud = null;
