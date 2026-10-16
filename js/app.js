@@ -12,7 +12,7 @@ const VIEWS = {
 const PAGE_META = {
   spell:   { icon: "⌨️", title: "拼写练习", sub: "看中文，一个字母一个字母敲出英文" },
   cards:   { icon: "🃏", title: "单词卡",   sub: "看中文、例句、词性与单复数" },
-  etymon:  { icon: "📖", title: "词源词典", sub: WORDS.filter(w => w.root).length + " 个词的故事，知道为什么是这个意思" },
+  etymon:  { icon: "📖", title: "词源词典", sub: "每个单词的故事 · 知道为什么是这个意思，才记得牢" },
   grammar: { icon: "📚", title: "语法课",   sub: GRAMMAR.length + " 节零基础语法，每节配自测" },
   phrases: { icon: "💬", title: "口语",     sub: PHRASES.length + " 句日常口语，每句讲清用法" },
   quiz:    { icon: "✍️", title: "测验",     sub: "10 道中→英选择题，检验成果" },
@@ -1081,7 +1081,7 @@ function viewHome() {
     { v: "spell",   c: "spell",   icon: "⌨️", t: "拼写练习", d: "看中文，把英文一个字母一个字母敲出来。最核心的一步。" },
     { v: "cards",   c: "cards",   icon: "🃏", t: "单词卡",   d: "看中文、例句，点开看词性、单复数和词源详解。" },
     { v: "wrong",   c: "wrong",   icon: "📕", t: "错题本",   d: wrongCount ? `你有 ${wrongCount} 个还没订正的错词，点进来逐个攻克。` : "拼错/答错的词会收在这里，逐条订正才算掌握。" },
-    { v: "etymon",  c: "etymon",  icon: "📖", t: "词源词典", d: WORDS.filter(w => w.root).length + " 个词的故事，知道为什么是这个意思，才忘不掉。" },
+    { v: "etymon",  c: "etymon",  icon: "📖", t: "词源词典", d: "每个单词的故事 · 知道为什么是这个意思，才忘不掉。" },
     { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
@@ -2121,7 +2121,7 @@ function viewEtymon() {
       </summary>
       ${w.senses ? `<h4>💬 其他常见用法</h4><p class="why">${w.senses}</p>` : ""}
       ${w.plural ? `<h4>🔢 复数形式</h4><p class="why">${w.plural}</p>` : ""}
-      ${fbBlock("📖 这个意思是怎么来的", w.root, "root")}
+      ${w.root ? fbBlock("📖 这个意思是怎么来的", w.root, "root") : `<h4>📖 这个故事正在整理中</h4><p class="why muted">更多单词的来源故事会持续补充进来。</p>`}
       <h4>🧩 例句为什么这样说</h4>
       <p class="ex">${w.s}</p>
       ${w.why ? `<p class="why">${w.why}</p>` : ""}
