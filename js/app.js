@@ -15,7 +15,7 @@ const PAGE_META = {
   cards:   { icon: "🃏", title: "单词卡",   sub: "看中文、例句、词性与单复数" },
   etymon:  { icon: "📖", title: "词源词典", sub: "每个单词的故事 · 知道为什么是这个意思，才记得牢" },
   grammar: { icon: "📚", title: "语法课",   sub: GRAMMAR.length + " 节零基础语法，每节配自测" },
-  phrases: { icon: "💬", title: "口语",     sub: PHRASES.length + " 句日常口语，每句讲清用法" },
+  phrases: { icon: "💬", title: "口语",     sub: () => (typeof PHRASES !== "undefined" ? PHRASES.length : 0) + " 句口语 · 含 " + (typeof PHRASES_NATIVE !== "undefined" ? PHRASES_NATIVE.length : 0) + " 句 native 地道说法" },
   phrasals:{ icon: "🔗", title: "用法",     sub: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词，每个配例句" },
   quiz:    { icon: "✍️", title: "测验",     sub: "每轮从词库随机抽取 10 题，不固定" },
   me:      { icon: "📈", title: "我的",     sub: "学习记录、星星、打卡与错词本" },
@@ -34,7 +34,7 @@ function pageHead(meta) {
     <button class="back-home" data-back="home">← 返回首页</button>
     <div class="ph-title">
       <span class="ph-chip">${meta.icon}</span>
-      <span class="ph-text"><b>${meta.title}</b><small>${meta.sub}</small></span>
+      <span class="ph-text"><b>${meta.title}</b><small>${typeof meta.sub === "function" ? meta.sub() : meta.sub}</small></span>
     </div>
   </div>`;
 }
@@ -2757,7 +2757,7 @@ function viewPhrases() {
   return `
   ${todayBlock}
   <h2>💬 日常口语 ${PHRASES.length} 句　<span class="ph-count">已会 ${phraseDoneCount()} / ${PHRASES.length}</span></h2>
-  <p class="muted">每句都标了<b>音标</b>，照着念就能读准。点 🔊 可以听发音，然后大声跟读三遍；<b>觉得自己会说这句了，就点「我会了」</b>，进度会记在「我的」里。 点每句的 🎤 说给我听：你读出这句，我逐词标红哪些读错了。手机上若点了没反应，会弹出提示告诉你怎么解决。</p>
+  <p class="muted">这里分两类：<b>🗣 地道说法</b>是 native 在店里、街上、办公室里真会说的（含缩读 gonna / wanna 和高频俚语），<b>📘 基础表达</b>是课本上的规范句。学口语优先练 🗣 那几组。点 🔊 听<b>真人美音</b>，听不清就点 🐢 慢速（0.7 倍速）；<b>觉得自己会说这句了，就点「我会了」</b>，进度记在「我的」里。每句下面的 💡 说明是「什么时候说、为什么这么地道」，别跳过 —— 语法没错但开口很生硬，往往就差这一句提醒。</p>
   <div class="tipbox">
     <b>怎么练最有效</b>
     <ol class="tips">
@@ -2767,24 +2767,42 @@ function viewPhrases() {
     </ol>
   </div>
   <div class="ph-list">
-  ${PHRASES.map((p, i) => `
-    <div class="card phrase">
+  ${(function () {
+    // 按场景分组展示：地道的场景句排在前面，课文句归到「基础表达」放最后。
+    // 分组只改变显示顺序，data-phrase 仍用 PHRASES 里的原始下标，所以「我会了」的记录不会错位。
+    const groups = [];
+    const map = {};
+    PHRASES.forEach((p, i) => {
+      const key = p.scene || "基础表达";
+      if (!map[key]) { map[key] = { name: key, items: [] }; groups.push(map[key]); }
+      map[key].items.push({ p: p, i: i });
+    });
+    // 把「基础表达」挪到最后：先给的是能直接开口的地道说法
+    const basic = groups.findIndex(g => g.name === "基础表达");
+    if (basic >= 0) groups.push(groups.splice(basic, 1)[0]);
+    return groups.map(g => `
+      <div class="ph-group">
+        <h3 class="ph-gtitle">${g.name === "基础表达" ? "📘" : "🗣"} ${g.name} <span class="muted">${g.items.length} 句</span></h3>
+        ${g.items.map(({ p, i }) => `
+    <div class="card phrase${p.scene ? " is-native" : ""}">
       <div class="ph-idx">${String(i + 1).padStart(2, "0")}</div>
       <div class="ph-body">
-        <div class="ph-en">${p.en}</div>
+        <div class="ph-en">${p.en}${p.scene ? `<span class="ph-nat-tag">地道</span>` : ""}</div>
         <div class="ph-second">
           <span class="ph-ipa">${p.ph || ""}</span>
           <span class="ph-cn">${p.cn}</span>
         </div>
         ${p.tip ? `<div class="ph-tip">💡 ${p.tip}</div>` : ""}
       </div>
-      <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')">🔊 朗读</button>
+      <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}')" title="真人美音，正常语速">🔊 朗读</button>
+      <button class="mini" onclick="speak('${p.en.replace(/'/g, "\\'")}', true)" title="放慢到 0.7 倍速，听清每个词">🐢 慢速</button>
       <button class="mini" data-mic="${i}" title="点我，然后大声读出这句，我来听对错">${srRecording && srIdx === i ? "🎤 停止" : "🎤 说给我听"}</button>
       <button class="mini ${phraseDone(i) ? "ph-done" : ""}" data-phrase="${i}">${phraseDone(i) ? "✅ 已会" : "我会了"}</button>
       ${srIdx === i ? (srActive ? `<div class="ph-listening">🎤 正在听，请大声读出这句…</div>` : srRecording ? `<div class="ph-listening">🎤 录音中，点「停止」结束</div>` : srCloudUp ? `<div class="ph-listening">☁️ 上传识别中…</div>` : "") : ""}
       ${srIdx === i && srCompare ? phraseCmpHtml() : ""}
     </div>`).join("")}
-  </div>
+      </div>`).join("");
+  })()}
   <div class="card">
       <h3>⚠️ 为什么音标很重要</h3>
       <p class="muted">不标音标的话，你只能按字母猜读法，会读错很多。比如 work 里的 or 读 /ɜːr/ 不读 /ɔːr/，th 读 /θ/ 不读 /t/。照着音标念，一开始就练的是正确发音，这比事后纠正省力得多。</p>
@@ -2911,11 +2929,30 @@ function viewPhrasals() {
   }).join("")}
   </div>`;
 }
-function speak(t) {
-  if (!("speechSynthesis" in window)) return alert("当前浏览器不支持朗读");
-  speechSynthesis.cancel();
+/* ---------- 朗读：优先在线真人美音，失败自动回落浏览器合成 ----------
+   以前只用浏览器自带的 speechSynthesis（机器味重、每台设备声音还不一样）。
+   现在先播在线美音接口（真人发音库，整句朗读自然，国内可直接访问）；
+   万一网络不通或被浏览器拦截，自动退回原来的合成音，功能不会失效。
+   slow=true 时放慢到 0.72 倍速，零基础听得清每个词。 */
+var _speakAudio = null;
+function speak(t, slow) {
+  t = String(t || "").trim();
+  if (!t) return;
+  try {
+    if (_speakAudio) { try { _speakAudio.pause(); } catch (e) {} _speakAudio = null; }
+    var a = new Audio("https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(t) + "&le=eng");
+    a.playbackRate = slow ? 0.72 : 1;
+    a.onerror = function () { fallbackSpeak(t, slow); };
+    var pr = a.play();
+    if (pr && pr.catch) pr.catch(function () { fallbackSpeak(t, slow); });
+    _speakAudio = a;
+  } catch (e) { fallbackSpeak(t, slow); }
+}
+function fallbackSpeak(t, slow) {
+  if (!("speechSynthesis" in window)) return;
+  try { speechSynthesis.cancel(); } catch (e) {}
   const u = new SpeechSynthesisUtterance(t);
-  u.lang = "en-US"; u.rate = 0.85;
+  u.lang = "en-US"; u.rate = slow ? 0.6 : 0.85;
   speechSynthesis.speak(u);
 }
 
