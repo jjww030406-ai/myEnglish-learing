@@ -2630,10 +2630,20 @@ function viewPhrases() {
 /* ---------- 用法 · 短语动词 ---------- */
 /* ---------- 用法测验（不重复：测过的句子换新的） ---------- */
 var phTest = { active: false, list: [], qi: 0, picked: -1, right: 0 };
+/* 固定搭配专练：句子里短语保留，挖空后面的小品词/介词，从选项里选（像「We are looking forward __ your visit.」选 to） */
+var PH_PARTICLES = ["to","for","on","up","out","at","with","about","after","into","over","from","off","down","back","in","of","by","through","around"];
 function buildPhrasalTest() {
   const all = [];
   (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : []).forEach(function (p, pi) {
-    (p.tests || []).forEach(function (t, ti) { all.push({ id: pi + ":" + ti, s: t.s, a: t.a, phrase: p.phrase }); });
+    const words = (p.phrase || "").trim().split(/\s+/);
+    const last = (words[words.length - 1] || "").toLowerCase();
+    if (PH_PARTICLES.indexOf(last) < 0) return;              // 末词不是小品词（如 go to bed）→ 不出这题
+    const re = new RegExp("\\b" + last + "\\b", "i");
+    const ex = p.ex || "";
+    if (!re.test(ex)) return;
+    const s = ex.replace(re, "＿＿");                          // 挖掉小品词（第一个匹配即短语后的那个）
+    if (s === ex) return;
+    all.push({ id: pi + ":p", s: s, cn: p.exCn || "", a: last, phrase: p.phrase });
   });
   const tested = S.phrasalQuiz || [];
   let pool = all.filter(function (x) { return tested.indexOf(x.id) < 0; });
@@ -2641,10 +2651,9 @@ function buildPhrasalTest() {
   return shuffle(pool).slice(0, Math.min(8, pool.length));
 }
 function phTestQuestion(it) {
-  const others = (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS : [])
-    .filter(function (p) { return p.phrase !== it.phrase; }).map(function (p) { return p.phrase; });
-  shuffle(others);
-  return shuffle([it.a].concat(others.slice(0, 3)));   // 正确变位 + 3 个别的短语作干扰
+  const pool = PH_PARTICLES.filter(function (x) { return x !== it.a; });
+  shuffle(pool);
+  return shuffle([it.a].concat(pool.slice(0, 2)));   // 正确小品词 + 2 个干扰项（A/B/C 三选一）
 }
 function startPhrasalTest() {
   const list = buildPhrasalTest();
@@ -2680,13 +2689,14 @@ function phrasalTestBlock() {
   const ok = done && phTest.picked === opts.indexOf(it.a);
   return `
   <div class="card ph-test">
-    <div class="pht-head">🧪 用法测验 · 第 ${phTest.qi + 1} / ${phTest.list.length} 题　已对 ${phTest.right}</div>
-    <p class="pht-q">${it.s.replace("___", '<span class="pht-blank">＿＿＿</span>')}</p>
+    <div class="pht-head">🧪 固定搭配专练 · 第 ${phTest.qi + 1} / ${phTest.list.length} 题　已对 ${phTest.right}</div>
+    <p class="pht-q">${it.s.replace(/＿＿+|___+/, '<span class="pht-blank">＿＿</span>')}</p>
+    ${it.cn ? `<p class="muted" style="margin:-6px 0 12px;">${it.cn}</p>` : ""}
     <div class="pht-opts">
       ${opts.map(function (o, k) {
         let cls = "btn";
         if (done) { if (k === opts.indexOf(it.a)) cls += " good"; else if (k === phTest.picked) cls += " bad"; }
-        return `<button class="${cls}" data-pht="${k}" ${done ? "disabled" : ""}>${o}</button>`;
+        return `<button class="${cls}" data-pht="${k}" ${done ? "disabled" : ""}>${"ABC"[k] || k + 1}. ${o}</button>`;
       }).join("")}
     </div>
     ${done ? `<p class="${ok ? "sp-fb good" : "sp-fb bad"}">${ok ? "✅ 答对了！" : "❌ 正确答案：" + it.a}</p>` : ""}
@@ -2716,7 +2726,7 @@ function viewPhrasals() {
   <h2>🔗 用法 · 短语动词 ${list.length} 个</h2>
   <p class="muted">英语里很多意思不是靠单个单词，而是「动词 + 小品词」组合表达的——比如 <b>look for</b>（寻找）、<b>get up</b>（起床）、<b>turn on</b>（打开）。这里把最常用的短语动词逐个讲清：中文意思 + 例句 + 翻译，点 🔊 听发音，照着念几遍就记住了。<b>橙色提示</b>告诉你后面接什么、怎么变位。</p>
   <div class="card tipbox">
-    <button class="btn primary" data-act="phtest-start">🧪 开始用法测验</button>
+    <button class="btn primary" data-act="phtest-start">🧪 固定搭配专练</button>
   </div>
   <div class="phrasal-list">
   ${list.map(function (p) {
