@@ -15,7 +15,7 @@ const PAGE_META = {
   etymon:  { icon: "📖", title: "词源词典", sub: "每个单词的故事 · 知道为什么是这个意思，才记得牢" },
   grammar: { icon: "📚", title: "语法课",   sub: GRAMMAR.length + " 节零基础语法，每节配自测" },
   phrases: { icon: "💬", title: "口语",     sub: PHRASES.length + " 句日常口语，每句讲清用法" },
-  quiz:    { icon: "✍️", title: "测验",     sub: "10 道中→英选择题，检验成果" },
+  quiz:    { icon: "✍️", title: "测验",     sub: "每轮从词库随机抽取 10 题，不固定" },
   me:      { icon: "📈", title: "我的",     sub: "学习记录、星星、打卡与错词本" },
   today:   { icon: "📅", title: "今日任务", sub: "今天该学哪些词、哪些句子，哪些还没学" },
   wrong:   { icon: "📕", title: "错题本",   sub: "拼错/答错的词，逐条订正才算掌握" },
@@ -1102,7 +1102,7 @@ function viewHome() {
     { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
-    { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "10 道中→英选择题，检验今天的学习成果。" },
+    { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "每轮从你当前的词库随机抽 10 题（中→英 / 英→中随机），做完自动换一批，不固定。" },
     { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" }
   ];
   return `
@@ -2163,6 +2163,7 @@ function viewGrammar() {
   return `
   <h2>📚 语法课 · 零基础 ${GRAMMAR.length} 讲</h2>
   <p class="muted">按顺序学，每节包含：讲解 → 规则 → 为什么 → ${(GRAMMAR[0] && GRAMMAR[0].ex || []).length} 个例句 → 常见错误 → ${(GRAMMAR[0] && GRAMMAR[0].quiz || []).length} 道测验。<b>看完一定要做测验</b>，会用才算学会。</p>
+  <p class="muted">🌐 语法内容由<b>云端动态提供</b>（当前 ${GRAMMAR.length} 节，会持续补充更新，不写死在代码里）。</p>
   ${todayLesson != null ? `<div class="card tipbox grammar-today">
     <b>🎯 今天学这节：${String(GRAMMAR[todayLesson].t || "").replace(/^第\d+课：/, "")}</b>
     <p class="muted">${GRAMMAR[todayLesson].s || ""}　配你现在的阶段：${tp.goal}</p>
