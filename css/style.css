@@ -1458,3 +1458,15 @@ h2 { letter-spacing: .4px; }
   color:#fff; font-size:15px; cursor:pointer; }
 .modal-btn:hover { background:#256739; }
 .modal-msg { margin-top:10px; font-size:13px; color:#c0392b; min-height:18px; text-align:center; }
+
+/* ---------- 用法页：后接标记 + 测验 ---------- */
+.pc-pat { font-size: 12px; font-weight: 700; color: var(--brand); background: #eef4ff; border: 1px solid #cfe0ff; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+.ph-test { max-width: 640px; margin: 0 auto; }
+.pht-head { font-weight: 700; margin-bottom: 10px; }
+.pht-q { font-size: 19px; line-height: 1.7; margin-bottom: 14px; }
+.pht-blank { color: var(--brand-d); font-weight: 800; border-bottom: 2px dashed var(--brand); padding: 0 8px; }
+.pht-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pht-opts .btn { width: 100%; }
+.btn.good { background: #1f9d55 !important; color: #fff !important; border-color: #1f9d55 !important; }
+.btn.bad { background: #c0392b !important; color: #fff !important; border-color: #c0392b !important; }
+.ph-test .sp-fb { margin-top: 12px; }
