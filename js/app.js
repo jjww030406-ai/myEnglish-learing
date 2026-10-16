@@ -427,7 +427,7 @@ function render() {
   const top = view === "home" ? `
     <header class="top">
       <div class="brand-row">
-        <div class="brand"><span class="logo">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
+        <div class="brand"><span class="logo" data-mascot="logo" title="点我聊两句">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
         ${libBadge()}
       </div>
       <div class="chips">
@@ -503,9 +503,9 @@ function mascotInner() {
     (mascotMsg ? `<span class="mc-bubble" role="status"><b>${mascotFace}</b>${mascotMsg}</span>` : "");
 }
 function refreshMascot() {
-  // 只更新吉祥物按钮内部，不重绘整页（否则点一下会让所有卡片入场动画重播、整页闪一下）
-  const m = document.querySelector("[data-mascot]");
-  if (m) m.innerHTML = mascotInner();
+  // 只更新 Hero 里那只吉祥物的内部，不重绘整页（否则点一下会让所有卡片入场动画重播、整页闪一下）
+  // 顶栏那只小 🦉 也能点（data-mascot="logo"），但话由 Hero 那只来说，避免气泡把顶栏撑变形。
+  document.querySelectorAll('[data-mascot="1"]').forEach(m => m.innerHTML = mascotInner());
 }
 function hideMascot() {
   if (mascotTimer)      { clearTimeout(mascotTimer);      mascotTimer = null; }
@@ -544,8 +544,10 @@ function tapMascot() {
   const p = pool[Math.floor(Math.random() * pool.length)];
   mascotFace = p[0]; mascotMsg = p[1]; mascotTap++;
   refreshMascot();
-  const _m = document.querySelector("[data-mascot]");
-  if (_m) { _m.classList.remove("tapped"); void _m.offsetWidth; _m.classList.add("tapped"); }
+  // 点哪只猫头鹰都蹦一下（Hero 那只和顶栏那只都带上动画）
+  document.querySelectorAll("[data-mascot]").forEach(el => {
+    el.classList.remove("tapped"); void el.offsetWidth; el.classList.add("tapped");
+  });
   armMascotTimer(6000);   // 说完 6 秒自动收，不靠用户记得关
 }
 
