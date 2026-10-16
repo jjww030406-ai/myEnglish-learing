@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>从零部署到你的域名 jjww.new.tg · 图解教程</title>
+<style>
+  body{font-family:"Microsoft YaHei",system-ui,sans-serif;max-width:780px;margin:0 auto;padding:20px;color:#233;line-height:1.7;background:#f7f9fc}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:#667;font-size:13px;margin-bottom:6px}
+  .warn{background:#fff3cd;border-left:4px solid #f0a020;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;margin:10px 0}
+  .phase{background:#eef4ff;border-left:5px solid #3b6dff;padding:8px 14px;border-radius:0 8px 8px 0;font-weight:700;margin:18px 0 6px;font-size:15px}
+  .step{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:14px 18px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .num{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:#3b6dff;color:#fff;border-radius:50%;font-weight:700;margin-right:8px}
+  h2{font-size:15px;margin:0 0 8px}
+  svg{display:block;width:100%;height:auto;background:#f1f5fb;border-radius:10px;margin:8px 0}
+  .key{display:inline-block;background:#eef2ff;border:1px solid #cdddff;border-radius:6px;padding:1px 8px;font-weight:700;color:#234}
+  code{background:#eef;padding:1px 6px;border-radius:5px;font-size:13px}
+  .ok{color:#1e8449;font-weight:700}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+  th,td{border:1px solid #cdd6e6;padding:6px 8px;text-align:left}
+  th{background:#eef2ff}
+</style>
+</head>
+<body>
+<h1>📲 从零把网站放到你的域名 jjww.new.tg</h1>
+<div class="sub">你现在已经有了：① 域名 jjww.new.tg（已注册）② 网站文件（网盘里的 english-learning 文件夹）。下面照着点，分两阶段：先让网站上线，再绑到你的域名。</div>
+<div class="warn">全程不用敲任何命令。每一步都标了要点，跟着图走就行。卡住就把页面截图发我。</div>
+
+<div class="phase">阶段 A：先让网站在 GitHub Pages 上线</div>
+
+<div class="step">
+  <h2><span class="num">1</span>打开 GitHub 并登录</h2>
+  <svg viewBox="0 0 320 90">
+    <rect x="0" y="0" width="320" height="90" rx="8" fill="#f1f5fb"/>
+    <rect x="10" y="14" width="130" height="22" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <text x="18" y="29" font-size="12" fill="#666">🔍 github.com</text>
+    <rect x="205" y="12" width="105" height="26" rx="6" fill="#2da44e"/>
+    <text x="225" y="29" font-size="12" fill="#fff" font-weight="700">Sign in / Sign up</text>
+  </svg>
+  <p>浏览器输入 <span class="key">github.com</span>。没有账号点 <b>Sign up</b> 用邮箱注册（免费）；有就 <b>Sign in</b> 登录。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">2</span>进入你建的仓库 english-learning</h2>
+  <svg viewBox="0 0 320 110">
+    <rect x="0" y="0" width="320" height="110" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="14" width="292" height="26" rx="6" fill="#fff" stroke="#cbd5e1"/>
+    <text x="22" y="32" font-size="12" fill="#234" font-weight="700">你的用户名 / english-learning</text>
+    <rect x="14" y="52" width="120" height="20" rx="5" fill="#eef2ff" stroke="#cdddff"/>
+    <text x="20" y="66" font-size="11" fill="#3b6dff" font-weight="700">📂 Code</text>
+    <rect x="150" y="52" width="120" height="20" rx="5" fill="#eef2ff" stroke="#cdddff"/>
+    <text x="156" y="66" font-size="11" fill="#3b6dff" font-weight="700">⚙ Settings</text>
+  </svg>
+  <p>登录后，点你头像旁边找 <b>english-learning</b> 仓库进去。如果里面<b>还没传文件</b>，就先把网盘下的 english-learning 文件夹内容拖进去、点绿色 <b>Commit changes</b>（下面第 4 步会用到）。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">3</span>开启 Pages（让网站能被访问）</h2>
+  <svg viewBox="0 0 320 120">
+    <rect x="0" y="0" width="320" height="120" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="14" width="100" height="22" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <text x="22" y="29" font-size="11" fill="#555">⚙ Settings</text>
+    <rect x="14" y="50" width="292" height="56" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="24" y="70" font-size="11" fill="#555">① 左侧点 Pages</text>
+    <text x="24" y="88" font-size="11" fill="#555">② Source: main ／ ③ /(root) → Save</text>
+  </svg>
+  <p>进仓库点 <b>Settings</b> → 左边 <b>Pages</b> → <b>Source</b> 选 <span class="key">main</span>，文件夹选 <span class="key">/(root)</span> → 点 <b>Save</b>。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>等 1～2 分钟，先得到一个 github.io 网址</h2>
+  <svg viewBox="0 0 320 60">
+    <rect x="0" y="0" width="320" height="60" rx="8" fill="#f1f5fb"/>
+    <text x="16" y="28" font-size="12" fill="#555">你的临时网址：</text>
+    <text x="16" y="48" font-size="12" fill="#234" font-weight="700">https://你的用户名.github.io/english-learning/</text>
+  </svg>
+  <p>保存后等一会儿，打开上面的网址能看网站了（先别管它带尾巴，阶段 B 会换成你的域名）。</p>
+</div>
+
+<div class="phase">阶段 B：把网站绑到你的域名 jjww.new.tg</div>
+
+<div class="step">
+  <h2><span class="num">5</span>在 GitHub 填你的域名</h2>
+  <svg viewBox="0 0 320 110">
+    <rect x="0" y="0" width="320" height="110" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="14" width="100" height="22" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <text x="22" y="29" font-size="11" fill="#555">⚙ Settings → Pages</text>
+    <rect x="14" y="50" width="292" height="44" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="24" y="70" font-size="11" fill="#555">Custom domain：</text>
+    <rect x="120" y="60" width="160" height="22" rx="5" fill="#eef2ff" stroke="#cdddff"/>
+    <text x="128" y="75" font-size="11" fill="#234" font-weight="700">jjww.new.tg</text>
+  </svg>
+  <p>还在 Settings → Pages 这个页面，找 <b>Custom domain</b> 输入框，填 <span class="key">jjww.new.tg</span> → 点 <b>Save</b>。GitHub 会提示你去加 DNS（下一步）。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">6</span>去你买域名的地方，加 4 条解析记录</h2>
+  <p>登录你<b>注册 jjww.new.tg 的那个网站</b>（域名控制台），找「域名解析 / DNS 设置」。给<b>根域名</b>加下面 4 条 <span class="key">A 记录</span>（主机记录填 <code>@</code> 或留空）：</p>
+  <table>
+    <tr><th>类型</th><th>主机记录</th><th>记录值（IPv4 地址）</th></tr>
+    <tr><td>A</td><td>@（或空）</td><td>185.199.108.153</td></tr>
+    <tr><td>A</td><td>@（或空）</td><td>185.199.109.153</td></tr>
+    <tr><td>A</td><td>@（或空）</td><td>185.199.110.153</td></tr>
+    <tr><td>A</td><td>@（或空）</td><td>185.199.111.153</td></tr>
+  </table>
+  <svg viewBox="0 0 320 130">
+    <rect x="0" y="0" width="320" height="130" rx="8" fill="#f1f5fb"/>
+    <text x="14" y="20" font-size="11" fill="#555">域名控制台 → 域名解析 → 添加记录</text>
+    <rect x="14" y="30" width="292" height="90" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="24" y="50" font-size="11" fill="#333">类型 A ｜ 主机 @ ｜ 185.199.108.153</text>
+    <text x="24" y="70" font-size="11" fill="#333">类型 A ｜ 主机 @ ｜ 185.199.109.153</text>
+    <text x="24" y="90" font-size="11" fill="#333">类型 A ｜ 主机 @ ｜ 185.199.110.153</text>
+    <text x="24" y="110" font-size="11" fill="#333">类型 A ｜ 主机 @ ｜ 185.199.111.153</text>
+  </svg>
+  <p class="sub">这 4 个 IP 是 GitHub Pages 官方服务器地址，所有 GitHub 用户都一样，照抄即可。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">7</span>回到 GitHub 看它变绿 + 自动上锁</h2>
+  <svg viewBox="0 0 320 70">
+    <rect x="0" y="0" width="320" height="70" rx="8" fill="#f1f5fb"/>
+    <rect x="14" y="16" width="200" height="22" rx="5" fill="#e8f7ee" stroke="#1e8449"/>
+    <text x="22" y="31" font-size="11" fill="#1e8449" font-weight="700">✓ DNS check successful 🔒</text>
+    <text x="14" y="58" font-size="11" fill="#555">等几分钟，小绿锁出现 = HTTPS 证书已自动签发</text>
+  </svg>
+  <p>DNS 生效一般几分钟到几小时。回到 GitHub 的 Pages 页面，看到域名旁边变成 <span class="ok">✓ DNS check successful</span> 且带小锁，就成了。</p>
+</div>
+
+<div class="step" style="background:#eef7ff">
+  <h2><span class="num">8</span>🎉 手机打开你的域名</h2>
+  <svg viewBox="0 0 320 60">
+    <rect x="0" y="0" width="320" height="60" rx="8" fill="#f1f5fb"/>
+    <text x="16" y="28" font-size="13" fill="#234" font-weight="700">https://jjww.new.tg/english-learning/</text>
+    <text x="16" y="50" font-size="11" fill:#555>浏览器输入这个，https 开头，手机直接开，🎤 语音也能用</text>
+  </svg>
+  <p class="sub">注意网址后面带 <code>/english-learning/</code> 这个小尾巴（因为仓库叫这名字）。想去掉尾巴、直接 <code>jjww.new.tg</code> 就打开，把文件传到一个名字叫 <code>你的用户名.github.io</code> 的仓库即可，其它步骤一样。</p>
+</div>
+
+<div class="warn">卡住任何一步，把当前页面截图发我，我帮你定位。你只需要在两个地方登录：GitHub（放网站）和你买域名的网站（加解析），其余都是点按钮。</div>
+</body>
+</html>
