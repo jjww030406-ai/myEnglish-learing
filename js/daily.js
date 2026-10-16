@@ -1,13 +1,13 @@
 /* =====================================================================
    内容自动扩充引擎（取代原来会"学到 290 词就停"的旧逻辑）
    设计目标：网站按真实词频自己往后引入新词，永不绕回、无需人工扩充。
-   内容来源（按优先级自动取，哪级有就用哪级）：
-     1. 内置精选词库 BASE_WORDS（253 个，含 34 个词源详解）
-     2. 种子词库 WORD_SEED（最常用的几百个内容词，带中文，零依赖）
-     3. 运行时从免费词典 API 现抓（音标 / 例句，无需 key、支持 CORS）
+   内容来源（按优先级自动取，哪级有就用哪级）——全部运行时动态获取，没有任何写死上限：
+     1. 云端共享词库 __global_words__（Supabase，已预置数百词，并随用户使用自动累积）
+     2. 运行时从真实词频队列 WORD_FREQ（约 2200 常用词，按使用频率逐日引入新词，永不绕回）
+     3. 运行时从免费词典 / 翻译 API 现抓（音标 / 例句 / 中文，无需 key、支持 CORS）
      4. 浏览器端大模型（若云服务可用）补全中文；不可用则英文释义兜底
-     5. 个人本地缓存（localStorage）+ 云端共享词库（Supabase，自动累积）
-   所有词合并去重后写入全局 WORDS，课程引擎直接用它。
+     5. 个人本地缓存（localStorage）+ 内置精选 / 种子词库仅作离线兜底
+   所有词合并去重后写入全局 WORDS，课程引擎直接用它。词库会随使用持续增长，不是固定 253 个。
    ===================================================================== */
 (function () {
   "use strict";
@@ -195,14 +195,15 @@
   function applyWords(lib) {
     var seen = {}, out = [];
     function add(w) { if (w && w.w && !seen[w.w]) { seen[w.w] = 1; out.push(w); } }
+    // 云端共享 / 本地累积的词优先（运行时动态抓取、逐日扩充的部分）
+    (lib || []).forEach(add);
+    // 以下为离线兜底：断网或云端不可达时才用，绝不写死上限
     (typeof BASE_WORDS !== "undefined" ? BASE_WORDS : []).forEach(add);
-    // 种子表
     var seed = (typeof WORD_SEED !== "undefined") ? WORD_SEED : {};
     Object.keys(seed).forEach(function (k) {
       var s = seed[k];
       add({ w: k, ph: s.ph || "", cn: s.cn, s: s.s, sentCn: s.sentCn || "", pos: s.pos || "", src: "seed" });
     });
-    (lib || []).forEach(add);
     WORDS = out;
   }
 
@@ -386,9 +387,11 @@
   function applyGrammar(extra, shared) {
     var seen = {}, out = [];
     function add(p) { if (p && p.t && !seen[p.t]) { seen[p.t] = 1; out.push(p); } }
-    (typeof GRAMMAR !== "undefined" ? GRAMMAR : []).forEach(function (p, i) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || grammarLevel(i); add(q); });
-    (extra || []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 14; add(q); });
+    // 云端共享的语法优先（运行时动态提供、可随时在云端增删，不写死在代码里）
     (shared || []).forEach(add);
+    (extra || []).forEach(function (p) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || 14; add(q); });
+    // 本地语法仅作离线兜底
+    (typeof GRAMMAR !== "undefined" ? GRAMMAR : []).forEach(function (p, i) { var q = {}; for (var k in p) q[k] = p[k]; q.level = q.level || grammarLevel(i); add(q); });
     GRAMMAR = out;
     return out;
   }
