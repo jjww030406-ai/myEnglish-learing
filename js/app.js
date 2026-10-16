@@ -683,6 +683,8 @@ function bind() {
     b.onclick = () => { readShowCn = !readShowCn; render(); });
   document.querySelectorAll('[data-act="rdcheck"]').forEach(b =>
     b.onclick = () => checkReadFill());
+  document.querySelectorAll('[data-act="rdnext"]').forEach(b =>
+    b.onclick = () => gotoNextReading());
   document.querySelectorAll('[data-act="rdspeak"]').forEach(b =>
     b.onclick = () => startReadSpeech());
   document.querySelectorAll(".review-start").forEach(b =>
@@ -2164,7 +2166,7 @@ function viewGrammar() {
   if (todayLesson == null) todayLesson = null;
   return `
   <h2>📚 语法课 · 零基础 ${GRAMMAR.length} 讲</h2>
-  <p class="muted">按顺序学，每节包含：讲解 → 规则 → 为什么 → ${GRAMMAR[0].ex.length} 个例句 → 常见错误 → ${GRAMMAR[0].quiz.length} 道测验。<b>看完一定要做测验</b>，会用才算学会。</p>
+  <p class="muted">按顺序学，每节包含：讲解 → 规则 → 为什么 → ${(GRAMMAR[0] && GRAMMAR[0].ex || []).length} 个例句 → 常见错误 → ${(GRAMMAR[0] && GRAMMAR[0].quiz || []).length} 道测验。<b>看完一定要做测验</b>，会用才算学会。</p>
   ${todayLesson != null ? `<div class="card tipbox grammar-today">
     <b>🎯 今天学这节：${String(GRAMMAR[todayLesson].t || "").replace(/^第\d+课：/, "")}</b>
     <p class="muted">${GRAMMAR[todayLesson].s || ""}　配你现在的阶段：${tp.goal}</p>
@@ -2190,13 +2192,13 @@ function viewGrammar() {
       <div class="lesson-top">
         <span class="lesson-no">${i + 1}</span>
         ${i === todayLesson ? `<span class="lesson-today">今天学这节</span>` : ""}
-        ${done ? `<span class="lesson-done">${score} / ${g.quiz.length} ✓</span>` : ""}
+        ${done ? `<span class="lesson-done">${score} / ${(g.quiz||[]).length} ✓</span>` : ""}
       </div>
       <h3>${g.t.replace(/^第\d+课：/, "")}</h3>
       <p class="muted">${g.s}</p>
       <div class="lesson-meta">
         <span>📖 ${g.ex.length} 个例句</span>
-        <span>✍️ ${g.quiz.length} 道测验</span>
+        <span>✍️ ${(g.quiz||[]).length} 道测验</span>
       </div>
       <span class="more">点开学习 →</span>
     </div>`;
@@ -2213,32 +2215,33 @@ function viewGrammar() {
 function lessonPage(i) {
   const g = GRAMMAR[i];
   const st = gqState[i];
+  if (!g) return `<div class="card"><p class="muted">这节课暂时打不开（内容缺失）。</p><button class="btn back-btn" id="backLessons">← 返回课程列表</button></div>`;
   return `
   <button class="btn back-btn" id="backLessons">← 返回课程列表</button>
 
   <div class="card lesson-page">
-    <h2>${g.t}</h2>
-    <p class="lead">${g.s}</p>
+    <h2>${g.t || ""}</h2>
+    <p class="lead">${g.s || ""}</p>
 
     <h4>📐 规则</h4>
-    <ul class="rules">${g.b.map(x => `<li>${bold(x)}</li>`).join("")}</ul>
+    <ul class="rules">${(g.b || []).map(x => `<li>${bold(x)}</li>`).join("")}</ul>
 
     <h4>🧩 这条规则为什么这样</h4>
-    <p class="root">${g.why}</p>
+    <p class="root">${g.why || ""}</p>
 
-    <h4>💬 例句（${g.ex.length} 条）</h4>
+    <h4>💬 例句（${(g.ex || []).length} 条）</h4>
     <p class="muted">左边是英文（重点词加粗），右边是中文。大声读出来效果最好。</p>
     <div class="ex-list">
-      ${g.ex.map((x, n) => `<div class="ex-row">
+      ${(g.ex || []).map((x, n) => `<div class="ex-row">
         <span class="ex-no">${n + 1}</span>
         <span class="ex-en">${bold(x[0])}</span>
         <span class="ex-cn">${x[1]}</span>
-        <button class="mini" onclick="speak('${x[0].replace(/\*\*/g, "").replace(/'/g, "\\'")}')">🔊</button>
+        <button class="mini" onclick="speak('${String(x[0] || "").replace(/\*\*/g, "").replace(/'/g, "\\'")}')">🔊</button>
       </div>`).join("")}
     </div>
 
     <h4>⚠️ 中国人最容易犯的错</h4>
-    <div class="err-box">${g.err.split("\n").map(l => `<p>${l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</p>`).join("")}</div>
+    <div class="err-box">${(g.err || "").split("\n").map(l => `<p>${l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</p>`).join("")}</div>
   </div>
 
   ${quizBlock(i)}
@@ -2253,16 +2256,19 @@ function lessonPage(i) {
 /* ---------- 课末测验 ---------- */
 /* 确保某课的作答记录已存在（首次进入时调用） */
 function initGQuiz(i) {
+  if (!GRAMMAR[i]) return null;
   if (!gqState[i]) {
-    gqState[i] = { picks: new Array(GRAMMAR[i].quiz.length).fill(-1), right: 0, done: false, pastPerfect: false };
+    gqState[i] = { picks: new Array((GRAMMAR[i].quiz || []).length).fill(-1), right: 0, done: false, pastPerfect: false };
   }
   return gqState[i];
 }
 
 function quizBlock(i) {
   const g = GRAMMAR[i];
+  if (!g) return "";
+  const quiz = g.quiz || [];
   const st = gqState[i];
-  const total = g.quiz.length;
+  const total = quiz.length;
   const done = st && st.done;
   const allRight = done && st.right === total;
 
@@ -2279,7 +2285,7 @@ function quizBlock(i) {
         <span>${allRight ? "完全正确" : "还差一点，把错题看仔细"}</span>
       </div>
       <div class="gq-review">
-        ${g.quiz.map((q, n) => {
+        ${quiz.map((q, n) => {
           const ok = st.picks[n] === q.a;
           return `<div class="gq-item ${ok ? "ok" : "bad"}">
             <div class="gq-q">${n + 1}. ${q.q}</div>
@@ -2294,7 +2300,7 @@ function quizBlock(i) {
         ${!allRight ? `<button class="btn" id="gqBackRead">回去看讲解</button>` : ""}
       </div>
     ` : `
-      ${g.quiz.map((q, n) => {
+      ${quiz.map((q, n) => {
         const picked = st.picks[n];
         const judged = picked >= 0;
         const ok = judged && picked === q.a;
@@ -2331,8 +2337,9 @@ function quizBlock(i) {
 }
 
 function startGQuiz(i) {
+  if (!GRAMMAR[i]) return;
   const old = gqState[i];
-  gqState[i] = { picks: new Array(GRAMMAR[i].quiz.length).fill(-1), done: false, right: 0,
+  gqState[i] = { picks: new Array((GRAMMAR[i].quiz || []).length).fill(-1), done: false, right: 0,
                  pastPerfect: old ? old.pastPerfect : false };
   render();
 }
@@ -2340,10 +2347,12 @@ function startGQuiz(i) {
 function pickGQuiz(n, k) {
   const st = initGQuiz(gqIdx);
   if (st.done) return;
+  const qz = (GRAMMAR[gqIdx] && GRAMMAR[gqIdx].quiz) || [];
   const pick = parseInt(k);
   if (isNaN(pick)) return;
   if (st.picks[n] === pick) return;              // 重复点同一个不重复计分
-  const q = GRAMMAR[gqIdx].quiz[n];
+  const q = qz[n];
+  if (!q) return;
 
   st.picks[n] = pick;
   if (pick === q.a) st.right++;                  // 立刻计分
@@ -2354,7 +2363,7 @@ function pickGQuiz(n, k) {
   // 全部答完 → 自动出成绩
   if (st.picks.every(p => p >= 0)) {
     st.done = true;
-    if (!st.pastPerfect && st.right === GRAMMAR[gqIdx].quiz.length) {
+    if (!st.pastPerfect && st.right === qz.length) {
       S.stars++; st.pastPerfect = true;
     }
     S.todayCount++;
@@ -2364,7 +2373,7 @@ function pickGQuiz(n, k) {
 
   // 没答完时滚到下一题，省得用户自己找
   if (!st.done) {
-    const nextQ = GRAMMAR[gqIdx].quiz.findIndex((_, i) => st.picks[i] < 0);
+    const nextQ = qz.findIndex((_, i) => st.picks[i] < 0);
     const box = document.getElementById("gqItm" + nextQ);
     if (box && box.scrollIntoView) box.scrollIntoView({ behavior: "smooth", block: "center" });
   } else {
@@ -2374,12 +2383,13 @@ function pickGQuiz(n, k) {
 }
 function submitGQuiz() {
   const g = GRAMMAR[gqIdx];
+  if (!g) return;
   const st = initGQuiz(gqIdx);
   if (st.done) return;
   const left = st.picks.filter(p => p < 0).length;
   if (left > 0) { alert("还有 " + left + " 题没选，答完会自动出成绩。"); return; }
   st.done = true;
-  if (!st.pastPerfect && st.right === g.quiz.length) { S.stars++; st.pastPerfect = true; }
+  if (!st.pastPerfect && st.right === (g.quiz || []).length) { S.stars++; st.pastPerfect = true; }
   S.todayCount++;
   store.set(GQ_KEY, JSON.stringify(gqState));
   save();
@@ -2930,9 +2940,10 @@ function viewRead() {
        <div class="rd-cn-block">📖 中文意思（先读熟，再对照填词）：<br>${art.cn}</div>
        <div class="rd-actions">
          <button class="btn primary" data-act="rdcheck">核对答案</button>
+         ${nextReadingBtn()}
          <span class="rd-result" id="rdResult"></span>
        </div>
-       <p class="muted">照着下面的中文意思，把英文里挖空的下划线处填上对应单词，填对变绿、填错变红。</p>`;
+       <p class="muted">照着下面的中文意思，把英文里挖空的下划线处填上对应单词，填对变绿、填错变红。填完点「核对答案」，全对会有小惊喜 🎉；想直接看下一篇翻译就点「下一篇 →」。</p>`;
   return `
   <h2>📖 阅读 · ${art.title}</h2>
   <div class="card">
@@ -2990,6 +3001,64 @@ function checkReadFill() {
   });
   const el = document.getElementById("rdResult");
   if (el) el.textContent = total ? `填对 ${right} / ${total}` : "";
+  // 全对 → 撒花庆祝
+  if (total > 0 && right === total) showReadCelebrate();
+}
+/* 下一篇：向前找下一篇「已解锁」的短文，循环查找；找不到返回 -1 */
+function nextReadingId() {
+  const n = (READING || []).length;
+  if (n === 0 || readId === "") return -1;
+  for (let step = 1; step <= n; step++) {
+    const i = (readId + step) % n;
+    if (i === readId) break;
+    if (readingUnlocked(READING[i].lv)) return i;
+  }
+  return -1;
+}
+function nextReadingBtn() {
+  const nxt = nextReadingId();
+  if (nxt < 0) return `<span class="muted">🎉 已是最新可读的短文，多掌握单词解锁更多 →</span>`;
+  return `<button class="btn ghost" data-act="rdnext">下一篇 →</button>`;
+}
+function gotoNextReading() {
+  const nxt = nextReadingId();
+  if (nxt < 0) { goView("read"); return; }
+  readId = nxt;
+  readMode = "trans";   // 直接进「整段翻译」模式
+  readShowCn = true;    // 默认把中文也显示出来，对照着看
+  render();
+}
+/* 全对庆祝：撒花 + 横幅，自动消失 */
+function showReadCelebrate() {
+  let box = document.getElementById("rdCelebrate");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "rdCelebrate";
+    box.className = "rd-celebrate";
+    box.innerHTML = `<div class="rd-confetti"></div>
+      <div class="rd-praise">
+        <div class="rd-praise-emoji">🎉</div>
+        <div class="rd-praise-txt">太棒了！全部填对！<br><small>点「下一篇 →」继续读下一篇 💪</small></div>
+      </div>`;
+    box.onclick = () => box.classList.remove("show");
+    document.body.appendChild(box);
+  }
+  box.classList.add("show");
+  const cf = box.querySelector(".rd-confetti");
+  if (cf) {
+    cf.innerHTML = "";
+    const emojis = ["🎉", "⭐", "✨", "💪", "🌟", "🏆", "👍", "🎊", "💡", "🌈"];
+    for (let i = 0; i < 30; i++) {
+      const s = document.createElement("span");
+      s.textContent = emojis[i % emojis.length];
+      s.style.left = (Math.random() * 100) + "vw";
+      s.style.animationDelay = (Math.random() * 0.5) + "s";
+      s.style.fontSize = (15 + Math.random() * 18) + "px";
+      cf.appendChild(s);
+    }
+  }
+  clearTimeout(showReadCelebrate._t);
+  showReadCelebrate._t = setTimeout(() => box.classList.remove("show"), 2800);
 }
 
 /* ---------- 阅读·语音跟读（听用户读整段，逐词标对错） ----------
