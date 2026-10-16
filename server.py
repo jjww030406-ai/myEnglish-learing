@@ -211,6 +211,82 @@ def extract_json(text):
     return None
 
 
+PLAN_SYSTEM = """你是一个为零基础中文成年人设计的「英语自适应学习路径规划师」。
+根据用户当前学习画像（已掌握词数、待订正错题、各拼写模式正确率、语法/阅读/短语进度、连续打卡天数），
+给出今天和近期该重点练什么的具体建议。
+只输出一个 JSON 对象（不要 markdown、不要额外文字），结构如下：
+{
+  "stage": "一句话说明当前阶段与距下一里程碑还差多少，如：A1 生存期，已掌握 120 词，距 500 词目标还差 380",
+  "summary": "一句话整体评估：当前强弱项",
+  "today_focus": [{"type":"word|grammar|reading|phrasal|review|speaking","title":"今日重点标题","why":"为什么安排这个（基于薄弱点）","action":"具体怎么做"}],
+  "weak_points": ["最该补的 1-3 个薄弱点"],
+  "next_milestone": "下一个阶段目标与达成条件"
+}
+要求：today_focus 最多 4 条；type 只能取枚举值；全部用简体中文，口语化、鼓励为主。"""
+
+
+def make_plan(profile):
+    """根据用户学习画像，让 AI 给出今天/近期该重点练什么。AI 不可用则规则兜底。"""
+    def g(k, d=0):
+        return profile.get(k, d)
+    ma = profile.get("mode_acc") or {}
+    def pct(x):
+        return "未测" if x is None else (str(x) + "%")
+    lines = [
+        f"已掌握词数(连对3次以上): {g('mastered')}",
+        f"累计学会词数: {g('learned')}",
+        f"词库总数: {g('total_words')}",
+        f"待订正错题数: {g('open_wrong')}",
+        f"连续打卡天数: {g('streak_days')}",
+        f"拼写各模式正确率: 中译英={pct(ma.get('cn'))}, 首字母={pct(ma.get('letter'))}, 听写={pct(ma.get('dict'))}",
+        f"语法课进度: 已完成 {g('grammar_done')}/{g('grammar_total')}",
+        f"阅读完成篇数: {g('reading_done')}",
+        f"短语测验已完成: {g('phrasal_done')} 题",
+        f"当前阶段: {g('stage_id')}",
+    ]
+    user = "用户学习画像：\n" + "\n".join(lines)
+    text, err = ai_chat([{"role": "user", "content": user}], PLAN_SYSTEM)
+    if err:
+        return _rule_plan(profile, "AI 暂不可用：" + str(err)[:80])
+    obj = extract_json(text)
+    if not isinstance(obj, dict):
+        return _rule_plan(profile, "AI 未返回可解析 JSON")
+    obj.setdefault("stage", "")
+    obj.setdefault("summary", "")
+    obj.setdefault("today_focus", [])
+    obj.setdefault("weak_points", [])
+    obj.setdefault("next_milestone", "")
+    obj["ai_error"] = None
+    return obj
+
+
+def _rule_plan(profile, note):
+    """纯规则兜底：不依赖 AI，保证永远能给建议。"""
+    mastered = profile.get("mastered", 0)
+    open_wrong = profile.get("open_wrong", 0)
+    focus = []
+    if open_wrong > 0:
+        focus.append({"type": "review", "title": f"先订正 {open_wrong} 个错题",
+                      "why": "错题不订正会一直拖后腿", "action": "进错题本逐个拼对订正"})
+    if mastered < 500:
+        focus.append({"type": "word", "title": "每天推进新词 + 复习旧词",
+                      "why": "词汇量是流利沟通的地基", "action": "跟着每日词单走，连对3次算掌握"})
+    else:
+        focus.append({"type": "grammar", "title": "加强语法与自由表达",
+                      "why": "词够了要练组合能力", "action": "多刷语法课和短语搭配专练"})
+    if profile.get("streak_days", 0) == 0:
+        focus.append({"type": "review", "title": "今天先打卡破零",
+                      "why": "连续打卡形成习惯", "action": "每天来练 10 分钟"})
+    return {
+        "stage": f"已掌握 {mastered} 词" + ("（A1 目标 500）" if mastered < 500 else "（已过 A1 门槛）"),
+        "summary": "（AI 暂不可用，以下为规则建议）" + ((" " + note) if note else ""),
+        "today_focus": focus,
+        "weak_points": ["见今日重点"],
+        "next_milestone": "持续提升词汇量与正确率，向流利沟通靠拢",
+        "ai_error": note,
+    }
+
+
 # ---------------- HTTP 处理 ----------------
 def _cors(h):
     h.send_header("Access-Control-Allow-Origin", ALLOW_ORIGIN)
@@ -301,6 +377,9 @@ class H(BaseHTTPRequestHandler):
                 "word": word, "ph": norm["ph"], "pos": norm["pos"], "def": norm["def"],
                 "dict_raw": raw[:2000], "ai": text, "ai_error": err,
             })
+        if u.path == "/api/plan":
+            b = self._body()
+            return _send(self, 200, make_plan(b.get("profile") or {}))
         return _send(self, 404, {"error": "not found"})
 
     def log_message(self, *a):
