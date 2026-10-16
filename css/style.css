@@ -2282,3 +2282,202 @@ h2::before { width: 5px; border-radius: 99px; }
 @media (max-width: 560px) {
   .sent-intro, .card.sent-intro { min-height: 0; padding: 24px 20px; }
 }
+
+/* =====================================================================
+   ★★ 高级化升级 v1 —— 从"可爱"转向"精致高级"
+   核心：更克制的饱和度、更考究的层次、微光/玻璃/渐变细节、优雅动效
+   ===================================================================== */
+
+:root {
+  /* 珊瑚降饱和一点，加高级灰调 */
+  --coral: #F4796B;          /* 原 #FF7A66 → 更沉稳 */
+  --coral-dark: #E25C4C;
+  --coral-soft: #FEEDE9;
+  /* 背景换成更高级的暖灰白（去掉奶油发黄感） */
+  --cream: #FBF9F7;
+  --ink: #22242E;
+  /* 描边更细腻 */
+  --line: #EDE8E3;
+
+  /* 多层柔和阴影（高级感关键：不是单一阴影） */
+  --shadow-sm: 0 1px 2px rgba(34,36,46,.04), 0 4px 12px rgba(34,36,46,.05);
+  --shadow:    0 2px 6px rgba(34,36,46,.05), 0 14px 34px rgba(34,36,46,.08);
+  --shadow-lg: 0 4px 12px rgba(34,36,46,.06), 0 28px 64px rgba(228,92,76,.12);
+}
+
+html, body { background: #FBF9F7; background-image: none; }
+
+/* ---------- 1. 全局：更考究的排版与细节 ---------- */
+body { letter-spacing: .1px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+h1, h2, h3 { letter-spacing: -.3px; }
+
+/* 精致滚动条 */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: #D8D2CB; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #C4BCB3; background-clip: content-box; }
+::selection { background: rgba(244,121,107,.22); }
+
+/* ---------- 2. 顶栏：漂浮玻璃条 + 细描边 ---------- */
+.top {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 8px 24px rgba(34,36,46,.06);
+}
+.top .brand .logo {
+  background: linear-gradient(140deg, #F4796B 0%, #E25C4C 70%, #C94B3C 100%);
+  box-shadow: 0 6px 16px rgba(226,92,76,.32), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.top button:hover, .nav button:hover {
+  background: rgba(244,121,107,.10); color: var(--coral-dark);
+}
+
+/* ---------- 3. Hero：深调渐变 + 细腻光晕，去甜腻 ---------- */
+.hero {
+  background: linear-gradient(135deg, #2C2E3E 0%, #3A3244 45%, #4A3550 100%);
+  box-shadow: 0 30px 70px rgba(34,36,46,.28), inset 0 1px 0 rgba(255,255,255,.08);
+  border-radius: 32px; position: relative; overflow: hidden;
+}
+/* 光晕：叠两层柔和的珊瑚+紫光，营造高级氛围 */
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(600px 300px at 85% 15%, rgba(244,121,107,.42), transparent 70%),
+    radial-gradient(500px 320px at 12% 90%, rgba(140,120,220,.34), transparent 72%);
+}
+.hero-inner { position: relative; z-index: 2; }
+.hero h1 { color: #fff; font-weight: 800; letter-spacing: -.6px; text-shadow: 0 2px 20px rgba(0,0,0,.18); }
+.hero p { color: rgba(255,255,255,.82); }
+.hero-pill {
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22);
+  color: #fff; backdrop-filter: blur(8px); font-weight: 700;
+}
+.hero-goal {
+  background: rgba(255,255,255,.96) !important; color: var(--coral-dark) !important;
+  border: none !important; font-weight: 700;
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+}
+.hero-glow { background: radial-gradient(circle, rgba(244,121,107,.30), transparent 62%); opacity: .9; }
+/* Hero 里的按钮：白底高级感 */
+.hero .btn.primary {
+  background: #fff; color: var(--coral-dark);
+  box-shadow: 0 8px 22px rgba(0,0,0,.16);
+}
+.hero .btn.primary:hover { box-shadow: 0 12px 30px rgba(0,0,0,.22); }
+
+/* ---------- 4. 首页统计条：玻璃白卡 + 细分割线 ---------- */
+.home-stats {
+  background: rgba(255,255,255,.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 12px 30px rgba(34,36,46,.06);
+}
+.home-stats .hs { transition: background .2s, transform .2s; }
+.home-stats .hs:hover { background: rgba(244,121,107,.06); transform: translateY(-2px); }
+.home-stats .hs .big { letter-spacing: -.5px; }
+
+/* ---------- 5. 模块卡：精致卡片 —— 顶部细渐变线 + 层次阴影 ---------- */
+.nav-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FEFEFE 100%);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 10px 26px rgba(34,36,46,.05);
+  transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s, border-color .28s;
+}
+.nav-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(244,121,107,.35);
+  box-shadow: 0 4px 12px rgba(34,36,46,.06), 0 26px 54px rgba(244,121,107,.16);
+}
+/* 图标胶囊：更内敛的浅色 + 内阴影 */
+.nav-card .nc-chip {
+  border-radius: 17px;
+  box-shadow: inset 0 0 0 1px rgba(34,36,46,.04), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.nav-card .nc-title { font-weight: 800; letter-spacing: -.2px; }
+.nc-go { letter-spacing: 0; }
+.nav-card:hover .nc-go::after { content: " →"; }
+
+/* ---------- 6. 卡片：高级版（更细描边 + 多层阴影 + 悬浮） ---------- */
+.card {
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 10px 28px rgba(34,36,46,.05);
+  transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(34,36,46,.06), 0 22px 48px rgba(34,36,46,.10); }
+
+/* ---------- 7. 按钮：高级质感（内高光 + 层次阴影） ---------- */
+.btn {
+  font-weight: 800; letter-spacing: .1px;
+  transition: transform .18s cubic-bezier(.34,1.4,.64,1), box-shadow .22s, filter .2s;
+}
+.btn.primary {
+  background: linear-gradient(140deg, #F4796B 0%, #E25C4C 100%);
+  box-shadow: 0 2px 6px rgba(226,92,76,.24), 0 12px 28px rgba(226,92,76,.28), inset 0 1px 0 rgba(255,255,255,.28);
+}
+.btn.primary:hover { transform: translateY(-2px); filter: brightness(1.03); box-shadow: 0 6px 14px rgba(226,92,76,.28), 0 18px 38px rgba(226,92,76,.34), inset 0 1px 0 rgba(255,255,255,.3); }
+.btn:not(.primary) {
+  background: #fff; color: var(--coral-dark);
+  border: 1.5px solid rgba(244,121,107,.32);
+  box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 4px 12px rgba(34,36,46,.05);
+}
+.btn:not(.primary):hover { border-color: var(--coral); background: #FFF9F8; }
+
+/* ---------- 8. 章节标题：更克制的处理 ---------- */
+h2 { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+h2::before { width: 4px; height: 18px; border-radius: 99px; background: linear-gradient(180deg, var(--coral), var(--coral-dark)); }
+
+/* ---------- 9. 进度条：去掉卡通黄，改高级渐变 ---------- */
+.bar { height: 8px; background: #EFEAE4; box-shadow: inset 0 1px 2px rgba(34,36,46,.06); }
+.bar i { background: linear-gradient(90deg, #F4796B, #E25C4C); box-shadow: 0 1px 3px rgba(226,92,76,.4); }
+
+/* ---------- 10. 测验选项：高级描边 + 悬浮 ---------- */
+.opt {
+  border: 1.5px solid var(--line); background: #fff;
+  transition: transform .18s, border-color .18s, box-shadow .18s, background .18s;
+}
+.opt:hover:not(:disabled) {
+  border-color: var(--coral); background: #FFF9F8; color: var(--coral-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(226,92,76,.10), 0 12px 26px rgba(226,92,76,.14);
+}
+.opt.right { background: linear-gradient(180deg,#ECFAF7,#E3F6F1); border-color: #4ECDC4; color: #1F8E86; box-shadow: 0 8px 20px rgba(78,205,196,.18); }
+.opt.wrong { background: linear-gradient(180deg,#FEEDE9,#FCE4DF); border-color: var(--coral); color: var(--coral-dark); }
+
+/* ---------- 11. 页眉：更内敛的软色 ---------- */
+.page-head {
+  background: linear-gradient(135deg, #FFF4F1 0%, #F6F4FB 100%);
+  border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(34,36,46,.04), 0 8px 22px rgba(34,36,46,.05);
+}
+
+/* ---------- 12. 输入框：高级细描边 ---------- */
+input, textarea, select { border: 1.5px solid var(--line); background: #fff; transition: border-color .18s, box-shadow .18s; }
+input:focus, textarea:focus, select:focus {
+  border-color: var(--coral); box-shadow: 0 0 0 4px rgba(244,121,107,.12); outline: none;
+}
+
+/* ---------- 13. 入场动效：更优雅（去弹跳，用缓出） ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+.hero, .home-stats, .card, .step, .ai-plan, .page-head, .mode, .nav-grid > .nav-card {
+  animation: fadeUp .6s cubic-bezier(.22,1,.36,1) backwards;
+}
+
+/* ---------- 14. 深色时段：更高级的暗色 ---------- */
+html[data-theme="night"] { --cream: #1E1F28; --line: #2E303C; }
+html[data-theme="night"] body { background: #1E1F28; }
+html[data-theme="night"] .card,
+html[data-theme="night"] .home-stats,
+html[data-theme="night"] .nav-card { background: #262833; border-color: #333645; }
+html[data-theme="night"] .top { background: rgba(38,40,51,.8); border-color: rgba(255,255,255,.06); }
+html[data-theme="night"] .nav-card .nc-chip { background: #2F323F; }
+
+/* ---------- Hero 文字对比度修正（深色底必须白字） ---------- */
+.hero .hero-inner h1, .hero h1 { color: #FFFFFF !important; }
+.hero .hero-inner p, .hero p { color: rgba(255,255,255,.85) !important; }
+.hero .hero-inner p b, .hero p b { color: #FFFFFF !important; border-bottom-color: rgba(255,255,255,.7) !important; }
+/* 谚语卡在深底上：更清楚的玻璃卡 */
+.hero .hp-quote, .hero blockquote { background: rgba(255,255,255,.12) !important; border: 1px solid rgba(255,255,255,.16) !important; }
+.hero .hp-quote *, .hero blockquote * { color: rgba(255,255,255,.92) !important; }
