@@ -1,0 +1,24 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=20261017c">
+<style>*{animation:none!important;transition:none!important}</style></head><body>
+<script>
+window.fetch=function(){var r={ok:false,status:0,json:function(){return Promise.resolve({})},text:function(){return Promise.resolve("")}};return Promise.resolve(r)};
+</script>
+<div class="wrap"><div id="app"></div></div>
+<script src="js/data.js"></script><script src="js/words-seed.js"></script><script src="js/wordfreq.js"></script>
+<script src="js/grammar.js"></script><script src="js/curriculum.js"></script><script src="js/state.js"></script>
+<script src="js/cloud-config.js"></script><script src="js/cloud-sync.js"></script><script src="js/wordlist.js"></script>
+<script src="js/phrases-extra.js"></script><script src="js/reading-extra.js"></script><script src="js/grammar-extra.js"></script>
+<script src="js/phrasals.js"></script><script src="js/daily.js"></script><script src="js/etym.js"></script>
+<script src="js/sentences.js"></script><script src="js/app.js"></script>
+<script>goView("home");</script><script>setTimeout(function(){
+  var l=document.querySelector(".top .brand .logo");
+  var b=document.querySelector(".top .brand");
+  var out=[];
+  out.push("logo存在:"+(!!l));
+  if(l){var cs=getComputedStyle(l);out.push("logo文本:"+l.textContent+"|宽:"+cs.width+"|高:"+cs.height+"|display:"+cs.display+"|bg:"+cs.backgroundImage.slice(0,40)+"|font-size:"+cs.fontSize);}
+  if(b){var cb=getComputedStyle(b);out.push("brand::before:"+getComputedStyle(b,"::before").content+"|brand display:"+cb.display);}
+  var pre=document.createElement("pre");pre.id="DIAG";pre.textContent=out.join("\n");document.body.appendChild(pre);
+},1500);</script></body></html>
