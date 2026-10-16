@@ -13,5 +13,8 @@ window.CLOUD_CONFIG = {
     url: "https://vseeskrcwconhoknwstm.supabase.co", // Supabase 项目根地址（不含 /rest/v1/）
     anonKey: "sb_publishable_2m6HQqQtZ06CHVfvf7hloA_EhFp6khq", // Supabase publishable key（前端可暴露）
     table: "learning_progress"
-  }
+  },
+  // 自建 Python 后端地址（留空 = 用原直连 / SDK）。填法：https://你的-python主机
+  // 开启后补词 / 生例句走 /api/enrich（服务端爬词典 + AI 整理，绕过 CORS、藏 key）
+  backend: ""
 };
