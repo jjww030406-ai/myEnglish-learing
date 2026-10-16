@@ -1970,3 +1970,315 @@ h2:first-child { margin-top: 2px; }
 
 /* 底部说明文字（"今日单词由…"）淡一点，不抢焦点 */
 .wrap > p.muted:last-of-type, .note, .foot-note { opacity: .8; }
+
+/* =====================================================================
+   ★ EnglishLeap 设计系统换肤层 ★
+   参考调性：暖珊瑚 + 奶油底 + 圆润字体 + 药丸导航 + 彩色图标胶囊 + 柔和呼吸阴影
+   做法：重新定义设计变量 + 覆盖关键组件外观，不动任何功能逻辑。
+   ===================================================================== */
+
+/* ---------- 1. 重新定义设计变量（全站换色根源） ---------- */
+:root {
+  /* 主色板 */
+  --coral: #FF7A66;
+  --coral-dark: #F2604A;
+  --coral-soft: #FFE9E3;
+  --bluee: #4F8DFB;
+  --bluee-soft: #E8F0FE;
+  --yellow: #FFC857;
+  --yellow-soft: #FFF3D6;
+  --teal2: #4ECDC4;
+  --teal2-soft: #E2F7F4;
+
+  /* 中性 */
+  --cream: #FFF8F2;
+  --ink: #2B2D42;
+
+  /* 覆盖旧品牌变量 → 全站自动跟随 */
+  --bg: #FFF8F2; --bg2: #FFFAF6; --card: #FFFFFF;
+  --line: #F0E7DF; --soft: #FFF4EC;
+  --txt: #2B2D42; --muted: #707487;
+  --brand: #FF7A66; --brand-d: #F2604A; --brand2: #FFE9E3;
+  --ok: #3BBDB4; --bad: #F2604A; --warn: #E8A33D;
+
+  /* 圆角更圆润 */
+  --radius: 22px; --radius-sm: 14px;
+
+  /* 呼吸感阴影 */
+  --shadow-sm: 0 4px 14px rgba(43,45,66,.06);
+  --shadow:    0 14px 34px rgba(255,122,102,.14);
+  --shadow-lg: 0 24px 56px rgba(79,141,251,.16);
+
+  --grad: linear-gradient(135deg, #FF7A66 0%, #F2604A 100%);
+  --grad-soft: linear-gradient(135deg, #FFE9E3, #FFF3D6);
+
+  /* 字体 */
+  --font-head: "Quicksand", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Nunito", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* 时段天色：统一走暖奶油调（不再蓝/橙撞色） */
+html, body { background: #FFF8F2; }
+body { font-family: var(--font-body); color: var(--ink); }
+h1, h2, h3, h4, .hero h1, .nc-title, .nc-go, .big, .hs .big,
+.btn, .brand, .mode b, .st-w, .course h3 {
+  font-family: var(--font-head);
+}
+
+/* 各时段全局底色也压到奶油系，避免撞色 */
+html[data-theme="morning"], html[data-theme="afternoon"],
+html[data-theme="evening"], html[data-theme="night"] {
+  --sky-a: #FFF8F2; --sky-b: #FFFBF7;
+}
+html[data-theme="night"] { --sky-a: #2A2634; --sky-b: #322C3E; }
+html[data-theme="night"] body { background: #2A2634; }
+
+/* ---------- 2. 顶栏：药丸玻璃导航 ---------- */
+.top {
+  width: min(1160px, 94vw); margin: 14px auto 0;
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  padding: 10px 16px 10px 22px;
+}
+.top .brand, .brand { font-weight: 800; letter-spacing: .2px; }
+.brand .logo, .top .logo {
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--coral), var(--yellow));
+}
+
+/* 顶部导航按钮：药丸化 */
+.top button, .nav button {
+  border-radius: 999px; border-color: transparent; font-weight: 700;
+  color: var(--muted); padding: 9px 16px;
+}
+.top button:hover, .nav button:hover {
+  color: var(--coral-dark); background: var(--coral-soft);
+  border-color: transparent; transform: none; box-shadow: none;
+}
+
+/* ---------- 3. 按钮：珊瑚渐变药丸 ---------- */
+.btn { border-radius: 999px; font-weight: 800; border: none; padding: 12px 24px; }
+.btn.primary {
+  background: linear-gradient(135deg, var(--coral), var(--coral-dark));
+  color: #fff; box-shadow: 0 14px 30px rgba(255,122,102,.30);
+}
+.btn.primary:hover { transform: translateY(-2px); box-shadow: 0 20px 44px rgba(255,122,102,.40); }
+.btn:not(.primary) {
+  background: var(--bluee-soft); color: var(--bluee);
+}
+.btn:not(.primary):hover { transform: translateY(-2px); border-color: transparent; color: var(--bluee); }
+
+/* ---------- 4. 卡片：更圆、更柔、hover 抬升 ---------- */
+.card {
+  border-radius: var(--radius); border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm); background: var(--card);
+  transition: transform .2s, box-shadow .2s;
+}
+.card:hover { box-shadow: var(--shadow); }
+
+/* ---------- 5. Hero：暖珊瑚渐变大标题 + 奶油光晕 ---------- */
+.hero {
+  border-radius: 30px; overflow: hidden;
+  background: linear-gradient(135deg, #FF8E7A 0%, #FF7A66 45%, #FFA45C 100%);
+  box-shadow: 0 24px 56px rgba(255,122,102,.28);
+}
+.hero h1 { font-size: clamp(30px, 5vw, 42px); letter-spacing: -.5px; }
+.hero h1 .hl, .hero .hl { color: #FFF3D6; }
+.hero-pill, .hero-goal {
+  background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.45);
+  border-radius: 999px; backdrop-filter: blur(6px);
+}
+.hero-glow {
+  background: radial-gradient(circle, rgba(255,243,214,.55), transparent 65%);
+}
+.hero .btn.primary { background: #fff; color: var(--coral-dark); }
+
+/* ---------- 6. 首页统计条：白卡 + 彩色圆角图标 ---------- */
+.home-stats {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--line);
+}
+.home-stats .hs { border-radius: 16px; }
+.home-stats .hs:hover { background: var(--soft); }
+.hs-ico, .home-stats .hs .hs-ico { border-radius: 13px; background: var(--coral-soft); }
+
+/* ---------- 7. 模块卡：圆角 + 彩色胶囊图标 + 珊瑚“进入” ---------- */
+.nav-card {
+  border-radius: var(--radius); border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm); transition: transform .2s, box-shadow .2s;
+}
+.nav-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); border-color: var(--coral-soft); }
+.nav-card::before { display: none; }   /* 去掉左侧条，改用彩色图标胶囊区分 */
+.nav-card .nc-chip {
+  width: 56px; height: 56px; border-radius: 16px; font-size: 27px;
+  background: var(--coral-soft); box-shadow: none;
+}
+/* 各模块图标底色循环用四色（像参考站的模块卡） */
+.nav-card:nth-child(4n+1) .nc-chip { background: var(--coral-soft); }
+.nav-card:nth-child(4n+2) .nc-chip { background: var(--bluee-soft); }
+.nav-card:nth-child(4n+3) .nc-chip { background: var(--yellow-soft); }
+.nav-card:nth-child(4n+4) .nc-chip { background: var(--teal2-soft); }
+.nav-card .nc-title { font-weight: 700; }
+.nc-go {
+  background: transparent; color: var(--coral-dark); font-weight: 800;
+  padding: 0; font-size: 13.5px;
+}
+.nav-card:hover .nc-go { background: transparent; color: var(--coral-dark); }
+
+/* ---------- 8. 测验/选项：圆角大按钮 + 珊瑚高亮 ---------- */
+.opt {
+  border-radius: var(--radius-sm); border: 2px solid var(--line);
+  font-weight: 600; color: var(--ink);
+}
+.opt:hover:not(:disabled) {
+  border-color: var(--coral); background: var(--coral-soft);
+  color: var(--coral-dark); transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(255,122,102,.16);
+}
+.opt.right { background: var(--teal2-soft); border-color: var(--teal2); color: #2A9D94; }
+.opt.wrong { background: var(--coral-soft); border-color: var(--coral); color: var(--coral-dark); }
+.quiz .q, .quizzq { font-family: var(--font-head); font-weight: 800; }
+
+/* ---------- 9. 进度条：珊瑚→阳光黄 ---------- */
+.bar { background: var(--line); border-radius: 999px; }
+.bar i { background: linear-gradient(90deg, var(--coral), var(--yellow)); border-radius: 999px; }
+.bar i::after { display: none; }
+
+/* ---------- 10. 页眉（内页标题条）：软色渐变 ---------- */
+.page-head {
+  background: linear-gradient(135deg, var(--coral-soft), var(--bluee-soft));
+  border: none; border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  padding: 22px 26px;
+}
+.page-head h3 { font-family: var(--font-head); font-size: 22px; font-weight: 800; }
+
+/* ---------- 11. 章节小标题：珊瑚竖条 ---------- */
+h2 { font-family: var(--font-head); }
+h2::before { background: var(--coral); }
+
+/* ---------- 12. 输入框 / 选择器 ---------- */
+input, textarea, select {
+  border-radius: var(--radius-sm); border: 2px solid var(--line);
+  font-family: var(--font-body);
+}
+input:focus, textarea:focus, select:focus { border-color: var(--coral); outline: none; }
+
+/* ---------- 13. 拼句词卡：沿用彩色成分但圆角统一 ---------- */
+.st-chip { border-radius: var(--radius-sm); }
+.st-input { border-radius: 0; }
+.st-key, .st-key kbd { border-radius: 999px; }
+.st-key:hover { border-color: var(--coral); color: var(--coral-dark); }
+
+/* ---------- 14. 页脚 ---------- */
+footer { background: #fff; border-top: 1px solid var(--line); border-radius: 0; }
+
+/* ---------- 15. 深色时段适配 ---------- */
+html[data-theme="night"] .card,
+html[data-theme="night"] .home-stats,
+html[data-theme="night"] .nav-card { background: #35303F; border-color: #453E52; }
+html[data-theme="night"] .top { background: rgba(53,48,63,.86); }
+
+/* =====================================================================
+   ★ 换肤精修 v2 —— 收敛内页大空白 + 模块卡舒展
+   ===================================================================== */
+
+/* 1. 内页内容给足下方呼吸，但不做强制居中（避免页眉被拉伸变形） */
+#app > .card.quizq { margin-top: 8px; }
+
+/* 2. 模块卡：4 列更舒展（参考站就是 4 列） */
+.nav-grid { grid-template-columns: repeat(4, 1fr); gap: 18px; }
+@media (max-width: 900px) { .nav-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .nav-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .nav-grid { grid-template-columns: 1fr; } }
+
+/* 3. 模块卡：图标更大、卡片内边距更舒服 */
+.nav-card { padding: 22px 20px 18px; gap: 10px; }
+.nav-card .nc-chip { width: 60px; height: 60px; font-size: 30px; border-radius: 18px; }
+.nav-card .nc-title { font-size: 17px; }
+.nav-card .nc-desc { min-height: 0; font-size: 12.5px; }
+
+/* 4. 顶部品牌：更清爽 */
+.top .brand { font-family: var(--font-head); font-size: 17px; font-weight: 800; }
+.top .brand .sub { font-family: var(--font-body); font-weight: 600; }
+
+/* 5. 首页统计条：图标彩色循环（参考站的四色） */
+.home-stats .hs:nth-child(4n+1) .hs-ico { background: var(--coral-soft); }
+.home-stats .hs:nth-child(4n+2) .hs-ico { background: var(--bluee-soft); }
+.home-stats .hs:nth-child(4n+3) .hs-ico { background: var(--yellow-soft); }
+.home-stats .hs:nth-child(4n+4) .hs-ico { background: var(--teal2-soft); }
+
+/* 6. 章节标题前的珊瑚竖条，更细更精致 */
+h2 { font-size: 21px; }
+h2::before { width: 5px; border-radius: 99px; }
+
+/* =====================================================================
+   ★ 换肤精修 v3 —— 品牌 LOGO / Hero 对比度
+   ===================================================================== */
+
+/* 顶栏品牌：圆角渐变 LOGO + 品牌名排布（参考站同款） */
+.top .brand { display: flex; align-items: center; gap: 11px; }
+.top .brand .logo {
+  width: 40px; height: 40px; border-radius: 13px; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 21px;
+  background: linear-gradient(135deg, var(--coral), var(--yellow));
+  box-shadow: 0 6px 14px rgba(255,122,102,.28);
+}
+.top .brand .brand-txt { display: flex; flex-direction: column; line-height: 1.15; }
+.top .brand .sub { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-top: 1px; }
+
+/* Hero 目标胶囊：提高在珊瑚底上的对比度 */
+.hero-goal {
+  background: rgba(255,255,255,.92) !important;
+  border: none !important;
+  color: var(--coral-dark) !important;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(0,0,0,.10);
+}
+.hero-goal .muted { color: #9a5a4c !important; }
+
+/* Hero 每日一句卡：玻璃感更清楚 */
+.hero .hp-quote, .hero blockquote { background: rgba(255,255,255,.16); border-radius: 16px; }
+
+/* Hero 里那颗小喇叭按钮 */
+.hp-say { background: rgba(255,255,255,.9) !important; color: var(--coral-dark) !important; }
+
+
+/* =====================================================================
+   ★ 换肤精修 v5 —— 用卡片高度撑起视觉重心（不用 flex 居中，无副作用）
+   ===================================================================== */
+
+/* 测验卡片：加大最小高度与内边距，内容纵向居中，成为整页焦点 */
+.card.quizq {
+  min-height: 400px; display: flex; flex-direction: column; justify-content: center;
+  padding: 40px 36px; border-radius: 26px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFFDFB 100%);
+  box-shadow: 0 10px 26px rgba(255,122,102,.08), 0 26px 60px rgba(43,45,66,.08);
+  border: 1px solid var(--line);
+}
+.quizq .q { font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 30px; }
+.quizq .opts { gap: 14px; }
+.quizq .opt { padding: 20px 18px; font-size: 17px; }
+.quizq .sp-fb, .quizq .qz-ex, .quizq .sp-ans { text-align: center; }
+
+/* 拼写/拼句等其他"主舞台"卡片也同样给足高度 */
+.card.sp-stage, .card:has(.st-stage) { min-height: 380px; }
+
+/* 内页底部操作栏与卡片之间留一点距离，不贴死 */
+.actionbar { margin-top: 16px; }
+
+@media (max-width: 560px) {
+  .card.quizq { min-height: 300px; padding: 26px 18px; }
+  .quizq .q { font-size: 20px; margin-bottom: 18px; }
+}
+
+/* 入口卡（拼句/阅读等介绍页）也给足高度，撑起页面 */
+.sent-intro, .card.sent-intro {
+  min-height: 320px; display: flex; flex-direction: column; justify-content: center;
+  padding: 40px 40px; border-radius: 26px;
+}
+@media (max-width: 560px) {
+  .sent-intro, .card.sent-intro { min-height: 0; padding: 24px 20px; }
+}
