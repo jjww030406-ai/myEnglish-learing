@@ -81,21 +81,29 @@
   }
 
   /* ---------------- 模型 ---------------- */
+  // 兜底模型：已在云端实测可用（约 7 秒出结果）。当模型列表拉不到时直接用它，
+  // 绝不让「没返回可用模型」把对话卡死。
+  var FALLBACK_MODEL = "hy3";
+
   async function pickModel() {
     var cached = null;
     try { cached = localStorage.getItem("el_model"); } catch (e) {}
+    if (cached && /^auto$/i.test(cached)) cached = null;   // auto 在流式接口会挂住，缓存里遇到就丢弃
+
     var ids = [];
     try {
       var ms = await cloud.llm.models.list();
       ids = (ms || []).filter(function (x) { return x && x.id && x.disabled !== true; })
                       .map(function (x) { return x.id; });
-    } catch (e) { return cached || null; }
-    if (!ids.length) return cached || null;
+    } catch (e) { /* 列表拉不到：用缓存或兜底，不抛错 */ }
+
+    // 缓存里的是真实可用模型 → 直接复用（省一次列表调用，更快）
     if (cached && ids.indexOf(cached) >= 0) return cached;
-    var ok = ids.filter(function (id) { return !/^auto$/i.test(id); });  // auto 在流式接口会挂住
+
+    var ok = ids.filter(function (id) { return !/^auto$/i.test(id); });  // 过滤 auto
     if (!ok.length) ok = ids;
     var prefer = ok.filter(function (id) { return /^hy/i.test(id); });
-    var id = prefer[0] || ok[0];
+    var id = prefer[0] || ok[0] || cached || FALLBACK_MODEL;
     try { localStorage.setItem("el_model", id); } catch (e) {}
     return id;
   }
