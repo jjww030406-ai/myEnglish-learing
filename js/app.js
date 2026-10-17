@@ -473,7 +473,7 @@ function render() {
   const top = view === "home" ? `
     <header class="top">
       <div class="brand-row">
-        <div class="brand"><span class="logo" data-mascot="logo" title="点我聊两句">🦉</span><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
+        <div class="brand"><img class="logo" src="favicon.svg" alt="LOGO" data-mascot="logo" title="点我聊两句"><span class="brand-txt">英语从零学 <span class="sub">零基础 · 每天 15 分钟</span></span></div>
         ${libBadge()}
       </div>
       <div class="chips">
