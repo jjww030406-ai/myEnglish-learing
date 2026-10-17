@@ -2709,3 +2709,14 @@ h2 { margin: 4px 0 14px; }
   .tk-log { max-height: 52vh; padding: 10px; }
   .tk-btns .btn { flex: 1; justify-content: center; }
 }
+
+/* 修复：LOGO 原先用 emoji 字符 + 渐变底衬，Windows/Edge 的 emoji 字体字形偏大且
+   带偏移，悬停放大时底衬会从左侧露出一个小橙点。改为直接用 favicon.svg 图片，
+   各平台渲染完全一致，不再有底衬错位。 */
+.top .brand img.logo {
+  background: none;
+  display: block;
+  object-fit: contain;
+  border-radius: 13px;
+  box-shadow: 0 4px 12px rgba(228,87,74,.28);
+}
