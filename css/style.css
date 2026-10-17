@@ -2035,7 +2035,7 @@ html[data-theme="night"] body { background: #2A2634; }
 
 /* ---------- 2. 顶栏：药丸玻璃导航 ---------- */
 .top {
-  width: min(1160px, 94vw); margin: 14px auto 0;
+  width: auto; margin: 0 0 16px;
   background: rgba(255,255,255,.86);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
