@@ -5,7 +5,7 @@ const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
   today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
-  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk
+  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk, film: viewFilm
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -25,7 +25,8 @@ const PAGE_META = {
   calendar:{ icon: "📅", title: "学习日历", sub: "哪天学了、哪天没学，连续打卡一目了然" },
   read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" },
   sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" },
-  talk:    { icon: "🗣", title: "情景对话", sub: "选个场景，你一句 AI 一句 —— 它会念给你听，顺手纠正你说得不地道的地方" }
+  talk:    { icon: "🗣", title: "情景对话", sub: "选个场景，你一句 AI 一句 —— 它会念给你听，顺手纠正你说得不地道的地方" },
+  film:    { icon: "🎬", title: "影视学习", sub: "看电影/剧学英语：双语字幕 + 变速 + 点词发音 + 单句循环" }
 };
 
 /* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
@@ -446,7 +447,7 @@ function render() {
   const labels = {
     home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
     grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法", sent: "🧩 拼句打字",
-    talk: "🗣 情景对话"
+    talk: "🗣 情景对话", film: "🎬 影视学习"
   };
 
   let body;
@@ -1319,6 +1320,7 @@ function viewHome() {
     { v: "grammar", c: "grammar", icon: "📚", t: "语法课",   d: GRAMMAR.length + " 节零基础语法课，每节配自测小测验。" },
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
     { v: "talk",    c: "talk",    icon: "🗣", t: "情景对话", d: "选个场景真的跟老外聊：你说一句，AI 接一句并用真人发音念出来，还会纠正你说得不地道的地方。" },
+    { v: "film",    c: "film",    icon: "🎬", t: "影视学习", d: "看电影/剧学英语：粘 YouTube 链接 + 你自己的字幕，双语字幕、变速、点词发音、单句循环，还有原创示例短片打开即用。" },
     { v: "phrasals", c: "phrasals", icon: "🔗", t: "用法",   d: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词（look for / get up / turn on…），每个配中文意思 + 例句 + 翻译。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
     { v: "sent",    c: "sent",    icon: "🧩", t: "拼句打字", d: (typeof SENTENCES !== "undefined" ? SENTENCES.length : 0) + " 个日常句子：看中文，逐词敲出英文，拼对的词变成彩色卡片，越连越上瘾。" },
@@ -1494,6 +1496,14 @@ function viewTalk() {
     </div>
   </div>`;
 }
+
+/* ---------- 影视学习：把渲染交给 film.js，自身只出外壳 ---------- */
+function viewFilm() {
+  // 渲染外壳，挂载后由 Film.mount 填充并接管事件；卸载由 tick 自清理。
+  setTimeout(function () { try { if (window.Film) window.Film.mount("filmMount"); } catch (e) {} }, 0);
+  return `<div id="filmMount"></div>`;
+}
+
 /* 发送：把输入框里的话交给 AI，拿到回复后自动重绘（AI 那句会自动念出来） */
 function talkSend() {
   const T = window.Talk;
