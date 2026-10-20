@@ -158,6 +158,7 @@ let spJustFixed = false;  // 本次是否"拼对了一个错题本里的词"（�
 let spAssisted = false;   // 本次是否"看了答案才拼出来的"（不计入掌握度）
 let spReview = false;     // 本轮是否为「每日复习」队列（做完要标记今天已复习）
 let spScore = { r: 0, w: 0 };
+let spMissed = [];       // 本轮真实拼错的词（重拼成功也不算订正，结果页如实汇报）
 let spQueue = [];        // 本轮题目队列
 let spPos = 0;          // 当前题序号
 let spListDone = false;
