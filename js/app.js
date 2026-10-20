@@ -2647,11 +2647,19 @@ function grammarDailyBlock() {
   var G = window.GrammarQuiz;
   if (!G) return "";
   var st = G.state;
+  var focus = (typeof G.focus === "function") ? G.focus() : "";
+  var focusIntro = ({
+    "时态": "🕒 <b>本期重点：时态</b>。时态告诉我们「动作发生在什么时候、进行到什么状态」——选错时态，对方就听不懂你想表达的时间点。本期练习覆盖一般现在 / 进行 / 过去 / 现在完成 / 将来等常见时态，每题解析都会讲清「为什么用这个时态」以及干扰项错在哪。",
+    "固定搭配": "🔗 <b>本期重点：固定搭配</b>。英语里很多词是「成双成对」的——比如 make a decision、do homework、take care of，换一个动词就不地道甚至错。本期专练这些高频固定搭配，解析会告诉你「为什么偏偏是这个词」。",
+    "综合": "📚 <b>本期综合练习</b>，混合时态与固定搭配，巩固前面学过的内容。每题解析同样会讲清「为什么」。",
+    "": "<b>本期练习</b>覆盖时态与固定搭配，每题解析都会讲清「为什么」。"
+  })[focus] || "";
   if (st.list.length) {
     var n = G.answered();
     return `<div class="card gq-card">
-      <div class="gq-head">📝 每日一练 · 语法 5 题 <span class="muted">${G.srcLabel()}</span></div>
-      <p class="muted">${st.checked ? "下面是每题的答案和解析 —— 重点看解析，知道自己为什么错。" : "先做完 5 题，再点「提交答案」，会一次性告诉你每题的对错和解析。"}</p>
+      <div class="gq-head">📝 每日一练 · 语法 ${st.list.length} 题 <span class="muted">${G.srcLabel()}</span></div>
+      <div class="gq-focus">${focusIntro}</div>
+      <p class="muted">${st.checked ? "下面是每题的答案和解析 —— 重点看解析，知道自己为什么错。" : "先做完 " + st.list.length + " 题，再点「提交答案」，会一次性告诉你每题的对错和解析。"}</p>
       ${st.list.map(function (q, qi) {
         var picked = st.picked[qi];
         var ok = picked === q.a;
@@ -2683,7 +2691,7 @@ function grammarDailyBlock() {
   // 首次进入：异步出题，出完自动重绘
   if (!st.loading) Promise.resolve(G.load()).then(function () { try { render(); } catch (e) {} });
   return `<div class="card gq-card">
-    <div class="gq-head">📝 每日一练 · 语法 5 题</div>
+    <div class="gq-head">📝 每日一练 · 语法 8 题</div>
     <p class="muted">🌐 正在按你现在的阶段现出题（大约 20 秒）…</p>
   </div>`;
 }
