@@ -1090,6 +1090,7 @@ function bind() {
   safe("#spGive", spGiveUp, "直接看答案");
   safe("#spNext", spNext, "下一题");
   safe("#spRetry", spRetryCheck, "我拼好了");
+  safe("#spSentWhy", spExplainSentence, "这句话再讲讲");
   safe("#spAgain", () => { spQueue = []; spListDone = false; render(); }, "再来一轮");
   safe("#spSwitch", () => { spQueue = []; spListDone = false; view = "spell"; render(); }, "换个模式");
   safe("#spTakeAdvice", () => {
@@ -2154,6 +2155,98 @@ function spSayBtn(w) {
   return `<button class="mini sp-say" title="听听这个单词怎么读" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 读一遍</button>`;
 }
 
+/* ---------- 例句讲解：拼对 / 看答案后出现 ----------
+   例句也是学习材料（"Good point." 到底什么意思？），所以：
+   1. 直接显示词库自带的句子中文意思（sentCn），不用点任何东西；
+   2. 想更深 → 点「这句话再讲讲」，AI 用中文讲清地道表达的意思和适用场合，
+      结果按词缓存，同一句不重复问。云端不可用时明确提示，绝不假装。 */
+var spSentExp = {};        // word → 讲解对象 {cn, phrase, phraseCn, use} 或 "ERR"
+var spSentBusy = false;
+var spSentCloud = null, spSentModel = "";
+
+function spSentBlock(w) {
+  if (!w || !w.s) return "";
+  const exp = spSentExp[w.w];
+  let out = "";
+  if (exp === "ERR") {
+    out = `<div class="sp-sent-out">⚠️ 这次没讲成（云服务暂时不可用），稍后再点一次试试。</div>`;
+  } else if (exp) {
+    out = `<div class="sp-sent-out">
+      ${exp.cn ? `<p><b>整句意思：</b>${esc(exp.cn)}</p>` : ""}
+      ${exp.phrase ? `<p><b>💡 地道表达「${esc(exp.phrase)}」：</b>${esc(exp.phraseCn || "")}</p>` : ""}
+      ${exp.use ? `<p><b>什么时候能用：</b>${esc(exp.use)}</p>` : ""}
+    </div>`;
+  }
+  return `<div class="sp-sent">
+    <div class="sp-sent-line">📖 例句 <b>${esc(w.s)}</b>
+      <button class="mini" title="听例句" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊</button></div>
+    ${w.sentCn ? `<div class="sp-sent-cn">句子意思：${esc(w.sentCn)}</div>` : ""}
+    <button class="mini" id="spSentWhy" ${spSentBusy ? "disabled" : ""}>${spSentBusy ? "⏳ AI 正在讲…" : "🔍 这句话再讲讲"}</button>
+    ${out}
+  </div>`;
+}
+
+function spSentCloudReady() {
+  if (spSentCloud) return true;
+  const CFG = window.CLOUD_CONFIG || {};
+  try {
+    if (window.WorkBuddyCloud && CFG.endpoint && CFG.publishableKey) {
+      spSentCloud = window.WorkBuddyCloud.createWorkBuddyCloud({ endpoint: CFG.endpoint, publishableKey: CFG.publishableKey });
+    }
+  } catch (e) {}
+  return !!spSentCloud;
+}
+async function spSentPickModel() {
+  if (spSentModel) return spSentModel;
+  var cached = null;
+  try { cached = localStorage.getItem("el_model"); } catch (e) {}
+  if (cached && !/^auto$/i.test(cached)) { spSentModel = cached; return cached; }  // auto 会挂住，弃用
+  var ids = [];
+  try {
+    var ms = await spSentCloud.llm.models.list();
+    ids = (ms || []).filter(x => x && x.id && x.disabled !== true).map(x => x.id);
+  } catch (e) { /* 列表拉不到就用缓存或兜底 */ }
+  var ok = ids.filter(id => !/^auto$/i.test(id));
+  var prefer = ok.filter(id => /^hy/i.test(id));
+  spSentModel = prefer[0] || ok[0] || cached || "hy3";
+  try { localStorage.setItem("el_model", spSentModel); } catch (e) {}
+  return spSentModel;
+}
+async function spExplainSentence() {
+  if (spSentBusy || !spWord) return;
+  const w = spWord;
+  if (spSentExp[w.w]) { render(); return; }
+  if (!spSentCloudReady()) { spSentExp[w.w] = "ERR"; render(); return; }
+  spSentBusy = true; render();
+  const sys = '你是给中国零基础英语学习者讲解英文句子的老师，讲解要口语化、简短。' +
+    '注意：cn 要用自然的中文口语翻译，不要逐字直译（比如 "Good point." 应该译成「说得有道理」「有道理」，而不是「好观点」）。只输出 JSON：' +
+    '{"cn":"整句的中文意思","phrase":"句子里最值得学的地道表达或短语（原样英文，没有就空字符串）",' +
+    '"phraseCn":"这个表达是什么意思、为什么这样说（中文）","use":"什么场合可以用这句话（中文，一句话）"}';
+  const user = "句子：" + w.s + "\n学习者刚学会的单词：" + w.w + "（" + (w.cn || "") + "）\n请讲解这个句子。";
+  var answer = "";
+  try {
+    const modelId = await spSentPickModel();
+    await Promise.race([
+      (async function () {
+        for await (var chunk of spSentCloud.llm.chat.completions.create({
+          model: modelId, stream: true,
+          messages: [{ role: "system", content: sys }, { role: "user", content: user }]
+        })) {
+          var d = chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
+          if (d) answer += d;
+        }
+      })(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000))
+    ]);
+    var j = (window.DailyEngine && DailyEngine.extractJSON) ? DailyEngine.extractJSON(answer) : null;
+    spSentExp[w.w] = (j && (j.cn || j.phrase)) ? j : "ERR";
+  } catch (e) {
+    spSentExp[w.w] = "ERR";
+  }
+  spSentBusy = false;
+  render();
+}
+
 function viewSpell() {
   if (!spQueue.length) spNewRound();
   if (spListDone) return spResultScreen();
@@ -2204,12 +2297,14 @@ function viewSpell() {
     }
     fb = `<div class="sp-fb bad">❌ <b>拼错了</b> —— ${where}</div>
       <div class="sp-ans">正确拼写：<b class="ans-word">${w.w}</b>${spSayBtn(w)}　<span class="muted">你写的：${youWrote || "（空）"}</span></div>
+      ${spSentBlock(w)}
       <div class="sp-fb retry">💡 输入框已清空 —— 现在<b>照着答案重新拼一遍</b>，拼好才会进入下一题。</div>`;
   } else if (spChecked) {
     fb = `<div class="sp-fb good">✅ <b>完全正确！</b>+1 ⭐</div>
       <div class="sp-ans"><b class="ans-word">${w.w}</b>${spSayBtn(w)} <span class="muted">${w.cn}</span></div>`;
     if (spJustFixed) fb += `<div class="sp-fb fixed-note">📕 <b>这个词之前在错题本里，现在拼对了 —— 已标记「已订正」！</b></div>`;
     fb += `<div class="fb-why">
+      ${spSentBlock(w)}
       ${etymBlockFor(w)}
       ${fbBlock("🧩 " + w.s + " 为什么这样说", w.why, "why")}
     </div>`;
