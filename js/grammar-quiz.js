@@ -65,7 +65,7 @@
     }).map(function (x) {
       var opts = (x.opts || []).slice(0, 4);
       var a = Math.max(0, Math.min(opts.length - 1, x.a | 0));
-      return { q: String(x.q), opts: opts, a: a, e: String(x.e || "") };
+      return { q: String(x.q), opts: opts, a: a, e: String(x.e || ""), cn: String(x.cn || "") };
     }).slice(0, DAILY_N);
   }
   /* AI 偶尔只给 3~4 题 → 用本地题库补足到 8 题，保证每天都是满 8 题 */
@@ -87,7 +87,7 @@
     var arr = (typeof GQ_EXTRA !== "undefined" ? GQ_EXTRA : []).filter(function (x) {
       return x && x.q && x.opts && x.opts.length >= 2 && typeof x.a === "number";
     }).map(function (x) {
-      return { q: x.q, opts: x.opts.slice(0, 4), a: Math.max(0, Math.min((x.opts || []).length - 1, x.a | 0)), e: x.e || "" };
+      return { q: x.q, opts: x.opts.slice(0, 4), a: Math.max(0, Math.min((x.opts || []).length - 1, x.a | 0)), e: x.e || "", cn: x.cn || "" };
     });
     if (topic && topic !== "综合") {
       var f = arr.filter(function (x) { return x.topic === topic; });
@@ -96,14 +96,20 @@
     return arr;
   }
 
-  /* 本地兜底：当日重点题 + 语法课测验题，随机凑满 8 题 */
+  /* 本地兜底：优先当日重点原创题（带 cn 中文），再补其他原创题，语法课测验题只做最后补位 */
   function localFallback() {
-    var pool = localBank(todayFocus());
-    (typeof GRAMMAR !== "undefined" ? GRAMMAR : []).forEach(function (g) {
-      (g.quiz || []).forEach(function (q) {
-        if (q && q.q && q.opts) pool.push({ q: q.q, opts: q.opts, a: q.a, e: q.e || "" });
+    var focus = localBank(todayFocus());
+    var pool = focus.concat(localBank("").filter(function (x) {
+      return !focus.some(function (f) { return f.q === x.q; });
+    }));
+    /* 原创题（带 cn）够 8 道就不再混入语法课测验题（无 cn） */
+    if (pool.length < DAILY_N) {
+      (typeof GRAMMAR !== "undefined" ? GRAMMAR : []).forEach(function (g) {
+        (g.quiz || []).forEach(function (q) {
+          if (q && q.q && q.opts) pool.push({ q: q.q, opts: q.opts, a: q.a, e: q.e || "" });
+        });
       });
-    });
+    }
     if (!pool.length) return [];
     for (var i = pool.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
@@ -157,8 +163,9 @@
       "2. 题干里用 ___ 表示要填的空，句子是日常会说的话，词汇不超过初中水平；\n" +
       "3. " + focusReq + "\n" +
       "4. 题目尽量考不同的点，不要重复；\n" +
-      "5. 每道题必须写中文解析，讲清楚「为什么选这个、其他选项错在哪」，不要只报答案。\n" +
-      '只输出 JSON 数组：[{"q":"题干","opts":["A","B","C","D"],"a":0,"e":"中文解析"}]';
+      "5. 每道题必须写中文解析，讲清楚「为什么选这个、其他选项错在哪」，不要只报答案；\n" +
+      "6. 同时给出整句中文意思 cn，让零基础用户先看懂句子。\n" +
+      '只输出 JSON 数组：[{"q":"题干","opts":["A","B","C","D"],"a":0,"e":"中文解析","cn":"整句中文意思"}]';
 
     var answer = "";
     var done = false;
