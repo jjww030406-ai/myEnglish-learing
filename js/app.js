@@ -519,6 +519,8 @@ function render() {
   if (view === "home") {
     try { loadAiPlan(); } catch (e) { console.error("loadAiPlan 出错", e); }
   }
+  // 全站单词自动补发音按钮（单词卡 / 今日词 / 错词本 / 词源 / 单词详情 / 拼句 / 逐词释义…）
+  try { decorateSpeak(app); } catch (e) { console.error("decorateSpeak 出错", e); }
 }
 
 /* 词库条数徽章：统一显示在顶栏「英语从零学」后面，其他位置不再重复显示这个词库信息。
@@ -3335,6 +3337,52 @@ function fallbackSpeak(t, slow) {
   const u = new SpeechSynthesisUtterance(t);
   u.lang = "en-US"; u.rate = slow ? 0.6 : 0.85;
   speechSynthesis.speak(u);
+}
+
+/* ---------- 全站单词自动补发音 ----------
+   用户要求：整个网站所有出现的单词都要能发音。
+   做法：每次渲染后，给所有"单词本体"元素（单词卡 / 今日词 / 错词本 /
+   词源 / 单词详情 / 拼句卡片 / 逐词释义 等，class 见下方白名单）自动注入一个
+   内联的 🔊 按钮；点按钮或点单词本身，都调用 speak() 真人美音朗读。
+   例句、短语、台词等本来就自带 🔊 的地方不受影响（它们不在白名单里）；
+   拼写练习按之前约定只在"拼对/看答案"后才出声音，也不在此列。 */
+var _SPK_SEL = ".wc-word, .tw-word, .detail-w, .et-w, .st-w, .witem > b, [data-word]";
+function decorateSpeak(root) {
+  root = root || document;
+  try {
+    root.querySelectorAll(_SPK_SEL).forEach(function (el) {
+      // 单词：优先取显式 data-word，否则取元素首词（去掉前后标点）
+      var w = el.getAttribute("data-word");
+      if (!w) w = (el.textContent || "").trim().split(/\s+/)[0];
+      w = (w || "").trim().replace(/^[^\w]+|[^\w]+$/g, "");
+      if (!w || !/^[A-Za-z][A-Za-z'\-.]{0,30}$/.test(w)) return;   // 只认纯英文单词
+      if (el.parentNode && el.parentNode.querySelector(":scope > [data-spk][data-w='" + w + "']")) return; // 已注入则跳过
+      var btn = document.createElement("button");
+      btn.className = "mini sp-say";
+      btn.setAttribute("data-spk", "");
+      btn.setAttribute("data-w", w);
+      btn.type = "button";
+      btn.textContent = "🔊";
+      btn.title = "朗读 " + w;
+      // 插在单词元素后面（同层级），不破坏原有结构
+      if (el.parentNode) el.insertAdjacentElement("afterend", btn);
+    });
+  } catch (e) { console.error("decorateSpeak 出错", e); }
+}
+// 全局点击代理：点 🔊 或点单词本体都能朗读（用代理，避免每次渲染重复绑定）
+if (!window.__spkBound) {
+  window.__spkBound = true;
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-spk]") : null;
+    if (b) { e.preventDefault(); e.stopPropagation(); speak(b.getAttribute("data-w"), false); return; }
+    var wd = e.target.closest ? e.target.closest(_SPK_SEL) : null;
+    if (wd && !e.target.closest("[data-spk]")) {
+      var w = wd.getAttribute("data-word");
+      if (!w) w = (wd.textContent || "").trim().split(/\s+/)[0];
+      w = (w || "").trim().replace(/^[^\w]+|[^\w]+$/g, "");
+      if (w && /^[A-Za-z][A-Za-z'\-.]{0,30}$/.test(w)) { e.preventDefault(); speak(w, false); }
+    }
+  });
 }
 
 /* ---------- 测验 ---------- */
