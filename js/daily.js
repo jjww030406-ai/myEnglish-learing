@@ -52,7 +52,16 @@
   ("the of and to in for is on that by this with it not or be are from at as all more an was will can us if " +
    "has which their any only his first am out up may other do does did have had been being they he she we you i " +
    "me my your our them what who where when why how but so than then also just very could should would might must " +
-   "shall been over under into about after before between during without within against off above below").split(" ")
+   "shall been over under into about after before between during without within against off above below " +
+   // —— 网站 SEO / 单位缩写 / 月份等"不是该背的生词"：来自 google-10000 前 2000 词的噪音，屏蔽掉
+   "search page site pm am re jan info rights copyright policy products software services contact email web " +
+   "links review list number date back top home free news business service price time system post online " +
+   "health world data next used last most music buy make them should product good video well where public " +
+   "books high school through each webb also rights school click view please available support message " +
+   "best information services some these its like than find name just state year day two after then " +
+   "rights public books high school each links review list name just over state year day into email two " +
+   "pm jan info re search page site copyright policy products software services contact web links " +
+   "mon fri sat sun oct nov dec feb mar apr aug sept sept").split(" ")
     .forEach(function (w) { STOP[w] = 1; });
 
   // 一个词能不能进「拼写/生词」体系：必须全小写、2~12 字母、且不是虚词黑名单。
@@ -114,6 +123,24 @@
     for (var i = 0; i < dateStr.length; i++) h = (h * 31 + dateStr.charCodeAt(i)) >>> 0;
     var start = h % list.length, out = [];
     for (var k = 0; k < n; k++) out.push(list[(start + k) % list.length]);
+    return out;
+  }
+  /* 取新词：从"日期哈希位置"起回绕扫描整个池子，只收"库里还没有 + 可拼写 + 非黑名单"的词。
+     关键改进：① 回绕 → 池子走到尽头也不会"假耗尽"后停摆；② 跳过 have（已入库的）→ 绝不重复加。
+     最多扫一遍池子就停，池子真走完时优雅返回现有能找到的全部，不会死循环。 */
+  function pickFresh(list, n, dateStr, have) {
+    list = list || [];
+    if (!list.length) return [];
+    var h = 0;
+    for (var i = 0; i < dateStr.length; i++) h = (h * 31 + dateStr.charCodeAt(i)) >>> 0;
+    var start = h % list.length, out = [], seen = {}, scanned = 0;
+    while (out.length < n && scanned < list.length) {
+      var w = list[(start + scanned) % list.length];
+      scanned++;
+      if (!w || have[w] || seen[w]) continue;
+      if (STOP[w] || !/^[a-z]{2,12}$/.test(w)) continue;
+      seen[w] = 1; out.push(w);
+    }
     return out;
   }
   /* 限并发执行：同一时刻最多 limit 个异步任务在跑，避免一次性打爆免费 API */
@@ -406,9 +433,11 @@
     Object.keys(seed).forEach(function (k) { have[k] = 1; });
     lib.forEach(function (w) { have[w.w] = 1; });
 
-    // 候选队列：优先 2200 词真实词频表（永不绕回），其次旧的有限清单
-    var queue = (typeof WORD_FREQ !== "undefined" && WORD_FREQ.length) ? WORD_FREQ
-              : (typeof WORD_LIST !== "undefined" ? WORD_LIST : []);
+    // 候选队列：基础词频表 + 中级补充词表（B1–B2）拼接，池子更大、质量更干净，且取词会回绕
+    var queue = []
+      .concat((typeof WORD_FREQ !== "undefined" && WORD_FREQ.length) ? WORD_FREQ : [])
+      .concat((typeof WORD_FREQ_EXTRA !== "undefined" && WORD_FREQ_EXTRA.length) ? WORD_FREQ_EXTRA : [])
+      .concat((typeof WORD_LIST !== "undefined" && WORD_LIST.length) ? WORD_LIST : []);
 
     // 断更补齐：上次补充到今天差几天，就一次性补几天（封顶 MAX_MAKEUP_DAYS）
     var missed = daysBetween(readLastSup(), dateStr);
@@ -416,8 +445,8 @@
     var want = Math.min(days * DAILY_N, (queue && queue.length) || 0);
     var makeupNote = days > 1 ? ("补齐 " + days + " 天漏学的") : "今日";
 
-    var picked = pickDaily(queue, want, dateStr);
-    var need = picked.filter(function (w) { return !have[w] && !STOP[w] && /^[a-z]{2,12}$/.test(w); });
+    var picked = pickFresh(queue, want, dateStr, have);
+    var need = picked;
 
     if (!need.length) {
       writeLastSup(dateStr);                     // 今天已补过，记一下，避免重复补
