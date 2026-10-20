@@ -2639,9 +2639,10 @@ function viewEtymon() {
 
 /* ---------- 语法课 ---------- */
 /* ---------- 语法「每日一练」：5 道选择题，题目云端动态生成，答完给答案+解析 ---------- */
-/* 把题干里的空格（___ / ____ / ＿＿，数量不定）统一渲染成「单个」下划线空档 */
+/* 把题干里的空格（___ / ____ / ＿＿，数量不定）统一渲染成一个下划线空档。
+   注意：span 内不放任何字符，只靠 CSS 的 border-bottom 画线，避免「字符线 + 边框线」变成两条 */
 function blankify(s, spanCls) {
-  return String(s || "").replace(/＿+|_+/g, '<span class="' + (spanCls || "gq-blank") + '">＿</span>');
+  return String(s || "").replace(/＿+|_+/g, '<span class="' + (spanCls || "gq-blank") + '">&nbsp;</span>');
 }
 function grammarDailyBlock() {
   var G = window.GrammarQuiz;
@@ -2665,6 +2666,7 @@ function grammarDailyBlock() {
         var ok = picked === q.a;
         return `<div class="gq-item">
           <div class="gq-q">${qi + 1}. ${blankify(q.q)}</div>
+          ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
           <div class="gq-opts">
             ${q.opts.map(function (o, k) {
               var cls = "opt";
@@ -2848,6 +2850,7 @@ function quizBlock(i) {
           const ok = st.picks[n] === q.a;
           return `<div class="gq-item ${ok ? "ok" : "bad"}">
             <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
+            ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
             ${!ok ? `<div class="gq-your">你的答案：<s>${q.opts[st.picks[n]] ?? "未作答"}</s></div>` : ""}
             <div class="gq-right">正确答案：<b>${q.opts[q.a]}</b></div>
             <div class="gq-e">${q.e}</div>
@@ -2866,6 +2869,7 @@ function quizBlock(i) {
         return `
       <div class="gq-item ${judged ? (ok ? "ok" : "bad") : "pending"}" id="gqItm${n}">
         <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
+        ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
         <div class="gq-opts">
           ${q.opts.map((o, k) => {
             let cls = "opt";
