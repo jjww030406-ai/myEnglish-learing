@@ -5,7 +5,7 @@ const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
   today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
-  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk, film: viewFilm
+  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk, film: viewFilm, scriptlines: viewScriptLines
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -26,7 +26,8 @@ const PAGE_META = {
   read:    { icon: "📖", title: "阅读",     sub: "分级短文：整段翻译 / 填单词，按进度解锁" },
   sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" },
   talk:    { icon: "🗣", title: "情景对话", sub: "选个场景，你一句 AI 一句 —— 它会念给你听，顺手纠正你说得不地道的地方" },
-  film:    { icon: "🎬", title: "影视学习", sub: "看电影/剧学英语：双语字幕 + 变速 + 点词发音 + 单句循环" }
+  film:    { icon: "🎬", title: "影视学习", sub: "看电影/剧学英语：双语字幕 + 变速 + 点词发音 + 单句循环" },
+  scriptlines: { icon: "📝", title: "台词精读", sub: "原创情景喜剧对话：精读讲解 + 跟读打分 + 填空自测，零版权风险" }
 };
 
 /* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
@@ -447,7 +448,7 @@ function render() {
   const labels = {
     home: "🏠 首页", review: "🔁 复习", spell: "⌨️ 拼写练习", cards: "🃏 单词卡", etymon: "📖 词源",
     grammar: "📚 语法课", phrases: "💬 口语", quiz: "✍️ 测验", wrong: "📕 错题本", me: "📈 我的", calendar: "📅 学习日历", read: "📖 阅读", phrasals: "🔗 用法", sent: "🧩 拼句打字",
-    talk: "🗣 情景对话", film: "🎬 影视学习"
+    talk: "🗣 情景对话", film: "🎬 影视学习", scriptlines: "📝 台词精读"
   };
 
   let body;
@@ -1321,6 +1322,7 @@ function viewHome() {
     { v: "phrases", c: "phrases", icon: "💬", t: "口语",     d: PHRASES.length + " 句日常口语，每句解释为什么这么用。" },
     { v: "talk",    c: "talk",    icon: "🗣", t: "情景对话", d: "选个场景真的跟老外聊：你说一句，AI 接一句并用真人发音念出来，还会纠正你说得不地道的地方。" },
     { v: "film",    c: "film",    icon: "🎬", t: "影视学习", d: "看电影/剧学英语：粘 YouTube 链接 + 你自己的字幕，双语字幕、变速、点词发音、单句循环，还有原创示例短片打开即用。" },
+    { v: "scriptlines", c: "scriptlines", icon: "📝", t: "台词精读", d: "原创情景喜剧对话（Corner Bean 咖啡馆六人组）：精读讲解每个地道说法、麦克风跟读自动打分、挖词填空自测，打开即用、零版权风险。" },
     { v: "phrasals", c: "phrasals", icon: "🔗", t: "用法",   d: (typeof PHRASALVERBS !== "undefined" ? PHRASALVERBS.length : 0) + " 个常用短语动词（look for / get up / turn on…），每个配中文意思 + 例句 + 翻译。" },
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
     { v: "sent",    c: "sent",    icon: "🧩", t: "拼句打字", d: (typeof SENTENCES !== "undefined" ? SENTENCES.length : 0) + " 个日常句子：看中文，逐词敲出英文，拼对的词变成彩色卡片，越连越上瘾。" },
@@ -1502,6 +1504,12 @@ function viewFilm() {
   // 渲染外壳，挂载后由 Film.mount 填充并接管事件；卸载由 tick 自清理。
   setTimeout(function () { try { if (window.Film) window.Film.mount("filmMount"); } catch (e) {} }, 0);
   return `<div id="filmMount"></div>`;
+}
+
+/* ---------- 台词精读：把渲染交给 scriptlines.js，自身只出外壳 ---------- */
+function viewScriptLines() {
+  setTimeout(function () { try { if (window.ScriptLines) window.ScriptLines.mount("slMount"); } catch (e) {} }, 0);
+  return `<div id="slMount"></div>`;
 }
 
 /* 发送：把输入框里的话交给 AI，拿到回复后自动重绘（AI 那句会自动念出来） */
@@ -2140,6 +2148,12 @@ function maskSentence(sentence, word) {
   return sentence.replace(new RegExp("(" + safe + ")", "gi"), blanks);
 }
 
+/* 单词发音按钮：只在答案已亮出（拼对 / 直接看答案 / 照答案重拼）时出现，
+   出题阶段绝不给 —— 听到发音等于提前泄题，尤其是听写模式。 */
+function spSayBtn(w) {
+  return `<button class="mini sp-say" title="听听这个单词怎么读" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 读一遍</button>`;
+}
+
 function viewSpell() {
   if (!spQueue.length) spNewRound();
   if (spListDone) return spResultScreen();
@@ -2150,11 +2164,18 @@ function viewSpell() {
 
   // 提示区：按模式决定给多少信息
   let prompt = "";
+  // 中文释义可能暂缺（新词还在生成/历史脏数据已清洗）——给诚实的降级提示，
+  // 绝不显示空白让人一头雾水，更不拿英文单词冒充中文意思。
+  const cnOrFallback = () => w.cn
+    ? esc(w.cn)
+    : `<span class="sp-cn-miss">（暂无中文释义）</span>` +
+      `${w.def ? `<span class="sp-def">英文提示：${esc(w.def)}</span>` : ""}` +
+      ` <button class="mini" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 听发音猜词</button>`;
   if (spMode === "cn") {
-    prompt = `<div class="sp-cn">${w.cn}</div>
+    prompt = `<div class="sp-cn">${cnOrFallback()}</div>
       <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>`;
   } else if (spMode === "letter") {
-    prompt = `<div class="sp-cn">中文意思：${w.cn}</div>
+    prompt = `<div class="sp-cn">中文意思：${cnOrFallback()}</div>
       <p class="ex">共 <b>${len}</b> 个字母，首字母是 <b class="big-first">${w.w[0]}</b></p>`;
   } else {
     prompt = `<div class="sp-ph">${w.ph}</div>
@@ -2182,11 +2203,11 @@ function viewSpell() {
       }
     }
     fb = `<div class="sp-fb bad">❌ <b>拼错了</b> —— ${where}</div>
-      <div class="sp-ans">正确拼写：<b class="ans-word">${w.w}</b>　<span class="muted">你写的：${youWrote || "（空）"}</span></div>
+      <div class="sp-ans">正确拼写：<b class="ans-word">${w.w}</b>${spSayBtn(w)}　<span class="muted">你写的：${youWrote || "（空）"}</span></div>
       <div class="sp-fb retry">💡 输入框已清空 —— 现在<b>照着答案重新拼一遍</b>，拼好才会进入下一题。</div>`;
   } else if (spChecked) {
     fb = `<div class="sp-fb good">✅ <b>完全正确！</b>+1 ⭐</div>
-      <div class="sp-ans"><b class="ans-word">${w.w}</b> <span class="muted">${w.cn}</span></div>`;
+      <div class="sp-ans"><b class="ans-word">${w.w}</b>${spSayBtn(w)} <span class="muted">${w.cn}</span></div>`;
     if (spJustFixed) fb += `<div class="sp-fb fixed-note">📕 <b>这个词之前在错题本里，现在拼对了 —— 已标记「已订正」！</b></div>`;
     fb += `<div class="fb-why">
       ${etymBlockFor(w)}
