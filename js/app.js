@@ -792,6 +792,7 @@ function bind() {
     if (!list.length) return;
     spQueue = list;
     spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+    spMissed = [];
     spMode = "cn"; spLoad();
     view = "spell"; render();
   };
@@ -898,6 +899,7 @@ function bind() {
     const w = curCard || WORDS[currentWordIndex()];
     spQueue = [w, ...shuffle(WORDS.filter(x => x.w !== w.w)).slice(0, 9)];
     spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+    spMissed = [];
     spMode = "cn"; spLoad();
     view = "spell"; render();
   };
@@ -1894,6 +1896,7 @@ function startReview() {
   if (!q.length) return;                    // 没有错题就不开复习
   spQueue = q;
   spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false;
+  spMissed = [];
   spMode = "cn"; spReview = true; spLoad();
   view = "spell"; render();
 }
@@ -1903,6 +1906,7 @@ function practiceOneWord(word) {
   if (!w) { goView("wrong"); return; }
   spQueue = [w];
   spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false;
+  spMissed = [];
   spMode = "cn"; spReview = false; spLoad();
   view = "spell"; render();
 }
@@ -2041,6 +2045,7 @@ function spNewRound() {
   // 自适应出题：错题 → 待巩固 → 新词 → 已掌握（凑数），越熟的词越少出现
   spQueue = adaptiveQueue(10);
   spPos = 0; spScore = { r: 0, w: 0 }; spListDone = false; spReview = false;
+  spMissed = [];
   spLoad();
 }
 function spLoad() {
@@ -2392,8 +2397,7 @@ function spResultScreen() {
   const total = spScore.r + spScore.w;
   const pct = total ? Math.round(spScore.r / total * 100) : 0;
   const rec = recommendMode(spMode);
-  const bd = queueBreakdown(spQueue);
-  const misN = spQueue.filter(w => w && wStat(w.w).streak === 0 && wStat(w.w).seen > 0).length;
+  const openN = openWrongWords().length;
   return `
   <h2>本轮结果</h2>
   <div class="card center">
@@ -2412,8 +2416,11 @@ function spResultScreen() {
     <h3>接下来建议</h3>
     <ul class="tips">
       ${rec ? `<li><b>${rec.why}</b>（点上面「换个模式」即可切换）</li>` : ""}
-      <li>本轮有 ${bd.wrong} 个错题、${misN} 个还没拼对——它们会被自动安排进你接下来的练习。</li>
-      <li>同一个词要<b>连续拼对 3 次</b>才会被判定为"已掌握"，之后出现的次数会自动变少。</li>
+      ${spMissed.length
+        ? `<li>本轮拼错了 <b>${spMissed.length}</b> 个词（${spMissed.slice(0, 5).join("、")}${spMissed.length > 5 ? " 等" : ""}）——已收进「📕 错题本」，下一轮出题会优先安排你再练。</li>`
+        : `<li>本轮一个都没拼错，漂亮！保持这个节奏。</li>`}
+      ${openN ? `<li>错题本现在共有 <b>${openN}</b> 个词等你订正，订正完会自动清出清单。</li>` : ""}
+      <li>同一个词要在之后<b>独立拼对</b>才算「已订正」，连续拼对 3 次判定为"已掌握"，之后出现的次数会自动变少。</li>
       <li>「中→英」正确率稳定 90% 以上，就可以转「首字母」模式；熟练后再挑战「听写」。</li>
     </ul>
   </div>
@@ -2455,6 +2462,7 @@ function spCheck() {
     // 拼错：不给「下一题」，进入重拼阶段，必须自己再拼一遍
     spChecked = false; spResult = false; spRetry = true;
     spScore.w++;
+    if (!spMissed.includes(spWord.w)) spMissed.push(spWord.w);  // 记入"本轮真实拼错"清单（结果页如实汇报）
     markWrongWord(spWord.w);                 // 记入错题本（累计次数 + 最后错误日期）
     bumpWord(spWord.w, false, false, spMode);  // 掌握度连对清零 → 明天还会再来找你
     spJustFixed = false;
@@ -2517,11 +2525,11 @@ function spGiveUp() {
 function spRetryCheck() {
   const ok = spIsCorrect();
   if (ok) {
-    spScore.r++; S.stars++;
+    // 注意：这题已经记为「拼错」了，重拼成功 ≠ 订正 ——
+    // 不加分、不标记已订正（否则结果页会显示 0 错题）。订正要等下一轮独立拼对才算。
     if (!S.learned.includes(spWord.w)) S.learned.push(spWord.w);
     markTodayWord(spWord.w);
-    spJustFixed = markFixedWord(spWord.w);
-    bumpWord(spWord.w, true, spAssisted, spMode);  // 抄对的（assisted）不算掌握
+    bumpWord(spWord.w, true, true, spMode);  // 当作"看过答案的拼对"：连对不清零以外的奖励，不算真会
     spChecked = true; spResult = true; spRetry = false;
     spSaveBest(); save(); render();
   } else {
