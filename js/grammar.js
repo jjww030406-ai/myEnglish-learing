@@ -24,15 +24,15 @@ var GRAMMAR = [
     ],
     err: "✗ I **am** student.（漏了冠词 a）　✓ I am **a** student.\n✗ She **are** my friend.（第三人称单数用 are）　✓ She **is** my friend.\n✗ I **have** 20 years.（中文\"我有\"的\"有\"不是 have）　✓ I **am** 20 years old.",
     quiz: [
-      { q: "My sister ___ a doctor.", opts: ["is", "are", "am", "be"], a: 0,
+      { q: "My sister ___ a doctor.", opts: ["is", "are", "am", "be"], a: 0, cn: "我的姐姐（妹妹）是一名医生。",
         e: "My sister 是 she / 单数名词，所以用 is。口诀：is 连着他她它，单数名词用 is。" },
-      { q: "I ___ very tired.", opts: ["am", "is", "are", "be"], a: 0,
+      { q: "I ___ very tired.", opts: ["am", "is", "are", "be"], a: 0, cn: "我非常累。",
         e: "I 后面永远用 am，缩写成 I'm。" },
-      { q: "We ___ ready.", opts: ["is", "am", "are", "be"], a: 2,
+      { q: "We ___ ready.", opts: ["is", "am", "are", "be"], a: 2, cn: "我们准备好了。",
         e: "we 是复数，用 are。" },
-      { q: "这棵树 ___ 很高。", opts: ["is", "are", "am", "be"], a: 0,
+      { q: "这棵树 ___ 很高。", opts: ["is", "are", "am", "be"], a: 0, cn: "这棵树很高。",
         e: "This tree 是单数（树），用 is。" },
-      { q: "正确的一句是？", opts: ["She are my friend.", "She is my friend.", "She am my friend.", "She be my friend."], a: 1,
+      { q: "正确的一句是？", opts: ["She are my friend.", "She is my friend.", "She am my friend.", "She be my friend."], a: 1, cn: "下面哪一句是正确的？",
         e: "第三人称单数用 is。" }
     ]
   },
@@ -59,15 +59,15 @@ var GRAMMAR = [
     ],
     err: "✗ She **don't** like it.（第三人称单数要用 doesn't）　✓ She **doesn't** like it.\n✗ **Does** he **likes** it?（does 后面用原形）　✓ Does he **like** it?\n✗ I **am** go to work.（go 是动词，不能跟 am 连用）　✓ I **go** to work.",
     quiz: [
-      { q: "He ___ TV every night.", opts: ["watch", "watches", "watchs", "watchies"], a: 1,
+      { q: "He ___ TV every night.", opts: ["watch", "watches", "watchs", "watchies"], a: 1, cn: "他每天晚上看电视。",
         e: "watch 以 ch 结尾，加 -es → watches。" },
-      { q: "She ___ like coffee.", opts: ["don't", "doesn't", "not", "isn't"], a: 1,
+      { q: "She ___ like coffee.", opts: ["don't", "doesn't", "not", "isn't"], a: 1, cn: "她不喜欢咖啡。",
         e: "第三人称单数否定用 doesn't + 动词原形。" },
-      { q: "___ your father work here?", opts: ["Do", "Does", "Is", "Are"], a: 1,
+      { q: "___ your father work here?", opts: ["Do", "Does", "Is", "Are"], a: 1, cn: "你父亲在这里工作吗？",
         e: "主语 your father 是第三人称单数，助动词用 Does。" },
-      { q: "正确的一句是？", opts: ["I likes it.", "She likes it.", "He like it.", "They likes it."], a: 1,
+      { q: "正确的一句是？", opts: ["I likes it.", "She likes it.", "He like it.", "They likes it."], a: 1, cn: "下面哪一句是正确的？",
         e: "只有第三人称单数 likes（以 s 结尾的动词直接加 s）。" },
-      { q: "My brother ___ to school by bike.", opts: ["go", "goes", "going", "gone"], a: 1,
+      { q: "My brother ___ to school by bike.", opts: ["go", "goes", "going", "gone"], a: 1, cn: "我哥哥（弟弟）骑自行车上学。",
         e: "My brother 是第三人称单数，用一般现在时 goes。" }
     ]
   },
@@ -94,15 +94,15 @@ var GRAMMAR = [
     ],
     err: "✗ I have two **book**.　✓ I have two **books**.\n✗ many **childs**　✓ many **children**\n✗ three **citys**　✓ three **cities**\n✗ I have many **advices**.（advice 不可数）　✓ I have a lot of **advice**.",
     quiz: [
-      { q: "There are five ___ in the box.", opts: ["box", "boxs", "boxes", "boxies"], a: 2,
+      { q: "There are five ___ in the box.", opts: ["box", "boxs", "boxes", "boxies"], a: 2, cn: "盒子里有五个……。",
         e: "以 x 结尾的名词复数加 -es → boxes。" },
-      { q: "The ___ are playing in the park.", opts: ["child", "childs", "childes", "children"], a: 3,
+      { q: "The ___ are playing in the park.", opts: ["child", "childs", "childes", "children"], a: 3, cn: "……正在公园里玩。",
         e: "child 的复数是不规则形式 children。" },
-      { q: "I want to visit three ___.", opts: ["city", "citys", "cities", "cityes"], a: 2,
+      { q: "I want to visit three ___.", opts: ["city", "citys", "cities", "cityes"], a: 2, cn: "我想去参观三个……。",
         e: "辅音字母 + y 结尾，变 y 为 i 再加 -es → cities。" },
-      { q: "My ___ are cold.", opts: ["foots", "feet", "feets", "foot"], a: 1,
+      { q: "My ___ are cold.", opts: ["foots", "feet", "feets", "foot"], a: 1, cn: "我的……很冷。",
         e: "foot 的复数是 feet，不规则变化。" },
-      { q: "She has three ___.", opts: ["baby", "babys", "babies", "babyes"], a: 2,
+      { q: "She has three ___.", opts: ["baby", "babys", "babies", "babyes"], a: 2, cn: "她有三个……。",
         e: "baby 复数是 babies。" }
     ]
   },
@@ -130,15 +130,15 @@ var GRAMMAR = [
     ],
     err: "✗ **Me** like music.　✓ **I** like music.\n✗ This book is **my**.　✓ This book is **mine**.\n✗ She likes **I**.　✓ She likes **me**.\n✔ her 和 hers 混用：her 后接名词，hers 单独用。",
     quiz: [
-      { q: "She helps ___.", opts: ["I", "me", "my", "mine"], a: 1,
+      { q: "She helps ___.", opts: ["I", "me", "my", "mine"], a: 1, cn: "她帮助……。",
         e: "helps 后面是宾语，要用宾格 me。" },
-      { q: "This is ___ book.", opts: ["she", "her", "hers", "she's"], a: 1,
+      { q: "This is ___ book.", opts: ["she", "her", "hers", "she's"], a: 1, cn: "这是……书。",
         e: "后面接名词 book，用形容词性物主代词 her。" },
-      { q: "That bag is ___.", opts: ["my", "me", "mine", "I"], a: 2,
+      { q: "That bag is ___.", opts: ["my", "me", "mine", "I"], a: 2, cn: "那个包是……的。",
         e: "后面不接名词，要用名词性物主代词 mine。" },
-      { q: "___ like English.", opts: ["Me", "I", "My", "Mine"], a: 1,
+      { q: "___ like English.", opts: ["Me", "I", "My", "Mine"], a: 1, cn: "……喜欢英语。",
         e: "做主语用主格 I。" },
-      { q: "正确的一句是？", opts: ["He talked to I.", "He talked to me.", "He talked to my.", "He talked to mine."], a: 1,
+      { q: "正确的一句是？", opts: ["He talked to I.", "He talked to me.", "He talked to my.", "He talked to mine."], a: 1, cn: "下面哪一句是正确的？",
         e: "talked to 后面跟宾语 me。" }
     ]
   },
@@ -166,16 +166,16 @@ var GRAMMAR = [
     ],
     err: "✗ There **have** a book.（\"有\"不能用 have）　✓ There **is** a book.\n✗ There **is** two books.（复数要用 are）　✓ There **are** two books.\n✗ There **has** a window.　✓ There **is** a window.",
     quiz: [
-      { q: "There ___ two apples on the table.", opts: ["is", "are", "have", "has"], a: 1,
+      { q: "There ___ two apples on the table.", opts: ["is", "are", "have", "has"], a: 1, cn: "桌子上有两个苹果。",
         e: "two apples 是复数，用 are。" },
-      { q: "There ___ some water in the bottle.", opts: ["are", "is", "have", "were"], a: 1,
+      { q: "There ___ some water in the bottle.", opts: ["are", "is", "have", "were"], a: 1, cn: "瓶子里有一些水。",
         e: "water 是不可数名词，用 is。" },
-      { q: "___ there any students in the room?", opts: ["Is", "Are", "Do", "Have"], a: 1,
+      { q: "___ there any students in the room?", opts: ["Is", "Are", "Do", "Have"], a: 1, cn: "房间里有一些学生吗？",
         e: "students 是复数，疑问句用 Are there。" },
-      { q: "There ___ a big park near my home.", opts: ["are", "were", "is", "have"], a: 2,
+      { q: "There ___ a big park near my home.", opts: ["are", "were", "is", "have"], a: 2, cn: "我家附近有一个大公园。",
         e: "a big park 是单数，用 is。" },
-      { q: "正确的一句是？", opts: ["There have many books.", "There are many books.", "There is many books.", "There has many books."], a: 1,
-        e: "\"有\"不用 have；many books 是复数，用 are。" }
+      { q: "正确的一句是？", opts: ["There have many books.", "There are many books.", "There is many books.", "There has many books."], a: 1, cn: "下面哪一句是正确的？",
+        e: "\\\"有\\\"不用 have；many books 是复数，用 are。" }
     ]
   },
   {
@@ -203,15 +203,15 @@ var GRAMMAR = [
     ],
     err: "✗ I go **to** home.　✓ I go **home**.（home 自带方向）\n✗ I am **in** home.　✓ I am **at** home.\n✗ a cup **of** breads　✓ a cup **of** bread（bread 不可数）\n✗ He lives **in** Beijing. ✓ He lives **in** Beijing.（对，但 live in 是对的；arrive 要用 at）",
     quiz: [
-      { q: "The keys are ___ the table.", opts: ["in", "on", "at", "to"], a: 1,
+      { q: "The keys are ___ the table.", opts: ["in", "on", "at", "to"], a: 1, cn: "钥匙在桌子……。",
         e: "在桌面上（表面）用 on。" },
-      { q: "I am waiting ___ the bus stop.", opts: ["in", "on", "at", "to"], a: 2,
+      { q: "I am waiting ___ the bus stop.", opts: ["in", "on", "at", "to"], a: 2, cn: "我正在公交车站……等车。",
         e: "在一个具体的点用 at。" },
-      { q: "This soup is very hot. Be careful!", opts: ["in", "on", "at", "for"], a: 2,
-        e: "\"小心烫\"是提醒对方小心某物，用 Be careful **for**... 这里指\"当心（这个）\"。" },
-      { q: "I go ___ school by bus.", opts: ["to", "/", "at", "on the"], a: 1,
-        e: "go to school 是固定搭配，意为\"上学\"，强调过程；不加 to 语气更绝对。" },
-      { q: "正确的一句是？", opts: ["She lives in Beijing.", "She lives at Beijing.", "She lives on Beijing.", "She lives to Beijing."], a: 0,
+      { q: "This soup is very hot. Be careful!", opts: ["in", "on", "at", "for"], a: 2, cn: "这汤很烫，小心点！",
+        e: "\\\"小心烫\\\"是提醒对方小心某物，用 Be careful **for**... 这里指\\\"当心（这个）\\\"。" },
+      { q: "I go ___ school by bus.", opts: ["to", "/", "at", "on the"], a: 1, cn: "我坐公交车去上学。",
+        e: "go to school 是固定搭配，意为\\\"上学\\\"，强调过程；不加 to 语气更绝对。" },
+      { q: "正确的一句是？", opts: ["She lives in Beijing.", "She lives at Beijing.", "She lives on Beijing.", "She lives to Beijing."], a: 0, cn: "下面哪一句是正确的？",
         e: "城市、国家用 in。" }
     ]
   },
@@ -239,15 +239,15 @@ var GRAMMAR = [
     ],
     err: "✗ I **am study** English.（进行时必须加 -ing）　✓ I am **studying** English.\n✗ I **am** work now.　✓ I **am working** now.\n✗ He **is runing**.　✓ He **is running**.（重读闭音节双写 n）\n✗ I am study, so I learn a lot. ✗（两个时态混用）",
     quiz: [
-      { q: "Look! The baby ___.", opts: ["cry", "cries", "is crying", "crying"], a: 2,
+      { q: "Look! The baby ___.", opts: ["cry", "cries", "is crying", "crying"], a: 2, cn: "看！婴儿正在……。",
         e: "Look! 提示此刻正在发生，用现在进行时 is + crying。" },
-      { q: "He ___ to music now.", opts: ["listen", "listens", "is listening", "listening"], a: 2,
+      { q: "He ___ to music now.", opts: ["listen", "listens", "is listening", "listening"], a: 2, cn: "他现在正在听音乐。",
         e: "now 提示此刻，进行时 is + listening。" },
-      { q: "They ___ football on Sundays.", opts: ["are playing", "play", "plays", "playing"], a: 1,
+      { q: "They ___ football on Sundays.", opts: ["are playing", "play", "plays", "playing"], a: 1, cn: "他们周日踢足球。",
         e: "on Sundays 表示习惯，用一般现在时 play，不是进行时。" },
-      { q: "She is ___ a book right now.", opts: ["read", "reads", "reading", "to reading"], a: 2,
+      { q: "She is ___ a book right now.", opts: ["read", "reads", "reading", "to reading"], a: 2, cn: "她此刻正在读一本书。",
         e: "be 动词后面必须跟动词 -ing 形式。" },
-      { q: "正确的一句是？", opts: ["I am runing.", "I am running.", "I running.", "I is running."], a: 1,
+      { q: "正确的一句是？", opts: ["I am runing.", "I am running.", "I running.", "I is running."], a: 1, cn: "下面哪一句是正确的？",
         e: "run 是重读闭音节，双写 n 加 -ing；主语 I 用 am。" }
     ]
   },
@@ -275,15 +275,15 @@ var GRAMMAR = [
     ],
     err: "✗ I didn't **went**.（did 后面用原形）　✓ I didn't **go**.\n✗ I **go**ed home.　✓ I **went** home.\n✗ I have **went**.　✓ I **went**.\n✗ He **did** not **went**.　✓ He **did not go**.",
     quiz: [
-      { q: "I ___ to Beijing last year.", opts: ["go", "goed", "went", "gone"], a: 2,
+      { q: "I ___ to Beijing last year.", opts: ["go", "goed", "went", "gone"], a: 2, cn: "我去年去了北京。",
         e: "go 的过去式是不规则形式 went。" },
-      { q: "She ___ finish her homework.", opts: ["didn't", "doesn't", "wasn't", "isn't"], a: 0,
+      { q: "She ___ finish her homework.", opts: ["didn't", "doesn't", "wasn't", "isn't"], a: 0, cn: "她……做完了作业。",
         e: "last night 提示过去，否定用 didn't + 动词原形。" },
-      { q: "They ___ many photos last night.", opts: ["take", "takes", "took", "taking"], a: 2,
+      { q: "They ___ many photos last night.", opts: ["take", "takes", "took", "taking"], a: 2, cn: "他们昨晚拍了很多照片。",
         e: "take 的过去式是 took。" },
-      { q: "___ you see him yesterday?", opts: ["Do", "Does", "Did", "Are"], a: 2,
+      { q: "___ you see him yesterday?", opts: ["Do", "Does", "Did", "Are"], a: 2, cn: "你昨天见到他了吗？",
         e: "yesterday 提示过去，助动词用 Did。" },
-      { q: "正确的一句是？", opts: ["I didn't went.", "I didn't go.", "I don't went.", "I didn't gone."], a: 1,
+      { q: "正确的一句是？", opts: ["I didn't went.", "I didn't go.", "I don't went.", "I didn't gone."], a: 1, cn: "下面哪一句是正确的？",
         e: "用了 did 之后，动词必须用原形。" }
     ]
   },
@@ -311,15 +311,15 @@ var GRAMMAR = [
     ],
     err: "✗ I can **to** go.　✓ I can **go**.\n✗ She can **swims**.　✓ She can **swim**.\n✗ Could you **helping** me?　✓ Could you **help** me?\n✗ I can **to** swim.　✓ I can **swim**.",
     quiz: [
-      { q: "I can ___ very fast.", opts: ["to run", "run", "runs", "running"], a: 1,
+      { q: "I can ___ very fast.", opts: ["to run", "run", "runs", "running"], a: 1, cn: "我能跑得很快。",
         e: "can 后面必须跟动词原形。" },
-      { q: "___ you help me, please?", opts: ["Can", "Are", "Do", "Is"], a: 0,
+      { q: "___ you help me, please?", opts: ["Can", "Are", "Do", "Is"], a: 0, cn: "请问你能帮我一下吗？",
         e: "Can you...? 是最常用的请求许可句式。" },
-      { q: "___ you say it again more slowly?", opts: ["Could", "Must", "Should", "May"], a: 0,
+      { q: "___ you say it again more slowly?", opts: ["Could", "Must", "Should", "May"], a: 0, cn: "你能再说慢一点吗？",
         e: "Could 比 Can 更委婉礼貌。" },
-      { q: "She can't ___ the answer.", opts: ["to know", "know", "knows", "knowing"], a: 1,
+      { q: "She can't ___ the answer.", opts: ["to know", "know", "knows", "knowing"], a: 1, cn: "她想不出答案。",
         e: "情态动词后接动词原形。" },
-      { q: "你 ___ see a doctor. 你应该去看医生。", opts: ["should", "should to", "shoulds", "are should"], a: 0,
+      { q: "你 ___ see a doctor. 你应该去看医生。", opts: ["should", "should to", "shoulds", "are should"], a: 0, cn: "你应该去看医生。",
         e: "should 是情态动词，后面接动词原形 see。" }
     ]
   },
@@ -347,15 +347,15 @@ var GRAMMAR = [
     ],
     err: "✗ **Where you are from?**　✓ **Where are you from?**\n✗ **How many books you have?**　✓ **How many books do you have?**\n✗ **What this is?**　✓ **What is this?**\n✗ **How much books?**（可数用 how many）　✓ **How many books?**",
     quiz: [
-      { q: "___ you from China?", opts: ["Where", "What", "Who", "How"], a: 0,
+      { q: "___ you from China?", opts: ["Where", "What", "Who", "How"], a: 0, cn: "你来自中国吗？",
         e: "问地点用 Where。" },
-      { q: "How many ___ do you have?", opts: ["book", "books", "a book", "the book"], a: 1,
+      { q: "How many ___ do you have?", opts: ["book", "books", "a book", "the book"], a: 1, cn: "你有多少个……？",
         e: "how many 后接可数名词复数。" },
-      { q: "___ is this book?", opts: ["How much", "How many", "How old", "How"], a: 0,
+      { q: "___ is this book?", opts: ["How much", "How many", "How old", "How"], a: 0, cn: "这本书……？",
         e: "问价格用 how much。" },
-      { q: "正确的一句是？", opts: ["Where are you from?", "Where you are from?", "Where is you from?", "Where you from?"], a: 0,
+      { q: "正确的一句是？", opts: ["Where are you from?", "Where you are from?", "Where is you from?", "Where you from?"], a: 0, cn: "下面哪一句是正确的？",
         e: "特殊疑问句结构：疑问词 + 一般疑问句。" },
-      { q: "___ is your father? 你爸爸是做什么的？", opts: ["What", "What do", "What does", "How"], a: 0,
+      { q: "___ is your father? 你爸爸是做什么的？", opts: ["What", "What do", "What does", "How"], a: 0, cn: "你爸爸是做什么的？（问职业）",
         e: "问职业用 What is he / What does he do?，不能加助动词在 be 动词前。" }
     ]
   },
@@ -379,11 +379,16 @@ var GRAMMAR = [
     ],
     err: "✗ I eat an banana.（banana 以辅音 /b/ 开头）　✓ a banana\n✗ She is teacher.（职业前漏 a）　✓ She is a teacher.\n✗ Open a door.（双方知道的门）　✓ Open the door.",
     quiz: [
-      { q: "___ apple a day.", opts: ["A", "An", "The", "/"], a: 1, e: "apple 以元音 /æ/ 开头，用 an。" },
-      { q: "He is ___ teacher.", opts: ["a", "an", "the", "/"], a: 0, e: "职业前用 a/an，teacher 以辅音开头用 a。" },
-      { q: "___ sun rises in the east.", opts: ["A", "An", "The", "/"], a: 2, e: "独一无二的事物用 the。" },
-      { q: "I have ___ orange.（橙子，元音开头）", opts: ["a", "an", "the", "/"], a: 1, e: "orange 以元音开头用 an。" },
-      { q: "正确的一句是？", opts: ["I like the books.", "I like a books.", "I like an books.", "I like books."], a: 3, e: "泛指复数不加冠词。" }
+      { q: "___ apple a day.", opts: ["A", "An", "The", "/"], a: 1, cn: "一天一个……。（谚语：一天一苹果，医生远离我）",
+        e: "apple 以元音 /æ/ 开头，用 an。" },
+      { q: "He is ___ teacher.", opts: ["a", "an", "the", "/"], a: 0, cn: "他是一位老师。",
+        e: "职业前用 a/an，teacher 以辅音开头用 a。" },
+      { q: "___ sun rises in the east.", opts: ["A", "An", "The", "/"], a: 2, cn: "……太阳从东方升起。",
+        e: "独一无二的事物用 the。" },
+      { q: "I have ___ orange.（橙子，元音开头）", opts: ["a", "an", "the", "/"], a: 1, cn: "我有一个橙子。",
+        e: "orange 以元音开头用 an。" },
+      { q: "正确的一句是？", opts: ["I like the books.", "I like a books.", "I like an books.", "I like books."], a: 3, cn: "下面哪一句是正确的？",
+        e: "泛指复数不加冠词。" }
     ]
   },
   {
@@ -406,11 +411,16 @@ var GRAMMAR = [
     ],
     err: "✗ He is more tall than me.（短词用 -er）　✓ taller than\n✗ This is the more big.（最高级用 -est）　✓ the biggest\n✗ She is gooder.（不规则）　✓ better.",
     quiz: [
-      { q: "He is ___ than me.", opts: ["tall", "taller", "tallest", "more tall"], a: 1, e: "比较级用 taller + than。" },
-      { q: "She is the ___ student.", opts: ["good", "better", "best", "well"], a: 2, e: "最高级 good→best。" },
-      { q: "This book is ___ than that one.", opts: ["interesting", "more interesting", "interestinger", "most interesting"], a: 1, e: "多音节词用 more + 原级。" },
-      { q: "正确的一句？", opts: ["He is taller that me.", "He is taller than me.", "He taller than me.", "He is tall than me."], a: 1, e: "比较级后接 than。" },
-      { q: "The weather is getting ___ and ___.", opts: ["good, good", "better, better", "best, best", "well, well"], a: 1, e: "越来越好用 better and better。" }
+      { q: "He is ___ than me.", opts: ["tall", "taller", "tallest", "more tall"], a: 1, cn: "他比我……。（比较级）",
+        e: "比较级用 taller + than。" },
+      { q: "She is the ___ student.", opts: ["good", "better", "best", "well"], a: 2, cn: "她是最……的学生。",
+        e: "最高级 good→best。" },
+      { q: "This book is ___ than that one.", opts: ["interesting", "more interesting", "interestinger", "most interesting"], a: 1, cn: "这本书比那本……。",
+        e: "多音节词用 more + 原级。" },
+      { q: "正确的一句？", opts: ["He is taller that me.", "He is taller than me.", "He taller than me.", "He is tall than me."], a: 1, cn: "哪一句是正确的？",
+        e: "比较级后接 than。" },
+      { q: "The weather is getting ___ and ___.", opts: ["good, good", "better, better", "best, best", "well, well"], a: 1, cn: "天气变得越来越……。",
+        e: "越来越好用 better and better。" }
     ]
   },
   {
@@ -433,11 +443,16 @@ var GRAMMAR = [
     ],
     err: "✗ I am often go.（be 后放 often 但用了 go）　✓ I often go.\n✗ I don't never eat.（双重否定）　✓ I never eat.\n✗ Often I am busy.（强调可放句首，但常态放句中）　✓ I am often busy.",
     quiz: [
-      { q: "He ___ late.", opts: ["is always", "always is", "is allways", "always are"], a: 0, e: "频率副词放 be 动词后。" },
-      { q: "I ___ read books.", opts: ["often", "am often", "often am", "is often"], a: 0, e: "实义动词前放 often。" },
-      { q: "___ do you exercise?", opts: ["How", "How often", "How long", "When"], a: 1, e: "问频率用 How often。" },
-      { q: "She ___ smokes.", opts: ["not never", "never", "doesn't never", "no never"], a: 1, e: "never 本身否定，不叠加 not。" },
-      { q: "正确的一句？", opts: ["I always am happy.", "I am always happy.", "Always I am happy.", "I am happy always."], a: 1, e: "频率副词在 be 后。" }
+      { q: "He ___ late.", opts: ["is always", "always is", "is allways", "always are"], a: 0, cn: "他……迟到了。",
+        e: "频率副词放 be 动词后。" },
+      { q: "I ___ read books.", opts: ["often", "am often", "often am", "is often"], a: 0, cn: "我……读书。",
+        e: "实义动词前放 often。" },
+      { q: "___ do you exercise?", opts: ["How", "How often", "How long", "When"], a: 1, cn: "你……锻炼？（问频率）",
+        e: "问频率用 How often。" },
+      { q: "She ___ smokes.", opts: ["not never", "never", "doesn't never", "no never"], a: 1, cn: "她……抽烟。",
+        e: "never 本身否定，不叠加 not。" },
+      { q: "正确的一句？", opts: ["I always am happy.", "I am always happy.", "Always I am happy.", "I am happy always."], a: 1, cn: "哪一句是正确的？",
+        e: "频率副词在 be 后。" }
     ]
   },
   {
@@ -460,11 +475,16 @@ var GRAMMAR = [
     ],
     err: "✗ I will to go.（will 后接原形）　✓ I will go.\n✗ He going to come.（缺 be）　✓ He is going to come.\n✗ I am go to sleep.（go 未变 going）　✓ I am going to sleep.",
     quiz: [
-      { q: "I ___ help you.", opts: ["will", "will to", "am will", "going"], a: 0, e: "will 后接动词原形。" },
-      { q: "It ___ rain.", opts: ["is going to", "going to", "will going", "goes to"], a: 0, e: "有迹象的将来用 be going to。" },
-      { q: "___ you come tomorrow?", opts: ["Do", "Are", "Will", "Did"], a: 2, e: "将来疑问用 Will you...?" },
-      { q: "He is ___ study.", opts: ["going to", "will", "go to", "to"], a: 0, e: "be going to + 原形。" },
-      { q: "正确的一句？", opts: ["I will goes.", "I will go.", "I going to go.", "I am will go."], a: 1, e: "will + 动词原形。" }
+      { q: "I ___ help you.", opts: ["will", "will to", "am will", "going"], a: 0, cn: "我……帮你。",
+        e: "will 后接动词原形。" },
+      { q: "It ___ rain.", opts: ["is going to", "going to", "will going", "goes to"], a: 0, cn: "天……下雨。",
+        e: "有迹象的将来用 be going to。" },
+      { q: "___ you come tomorrow?", opts: ["Do", "Are", "Will", "Did"], a: 2, cn: "你明天会来吗？",
+        e: "将来疑问用 Will you...?" },
+      { q: "He is ___ study.", opts: ["going to", "will", "go to", "to"], a: 0, cn: "他……学习。（be going to 表打算）",
+        e: "be going to + 原形。" },
+      { q: "正确的一句？", opts: ["I will goes.", "I will go.", "I going to go.", "I am will go."], a: 1, cn: "哪一句是正确的？",
+        e: "will + 动词原形。" }
     ]
   },
   {
@@ -487,11 +507,16 @@ var GRAMMAR = [
     ],
     err: "✗ I have went.（分词错）　✓ I have gone.\n✗ He have done.（三单用 has）　✓ He has done.\n✗ I did ever eat.（完成时不用 did）　✓ Have you ever eaten?",
     quiz: [
-      { q: "I ___ finished my homework.", opts: ["has", "have", "am", "did"], a: 1, e: "I 用 have + 过去分词。" },
-      { q: "She ___ gone home.", opts: ["have", "has", "is", "did"], a: 1, e: "三单用 has。" },
-      { q: "___ you ever been to Shanghai?", opts: ["Do", "Did", "Have", "Are"], a: 2, e: "经历提问用 Have you ever...?" },
-      { q: "过去分词 go 是？", opts: ["went", "gone", "goed", "going"], a: 1, e: "go 的过去分词是 gone。" },
-      { q: "正确的一句？", opts: ["He has did it.", "He has done it.", "He have done it.", "He did done it."], a: 1, e: "has + 过去分词 done。" }
+      { q: "I ___ finished my homework.", opts: ["has", "have", "am", "did"], a: 1, cn: "我……做完作业了。",
+        e: "I 用 have + 过去分词。" },
+      { q: "She ___ gone home.", opts: ["have", "has", "is", "did"], a: 1, cn: "她……回家了。",
+        e: "三单用 has。" },
+      { q: "___ you ever been to Shanghai?", opts: ["Do", "Did", "Have", "Are"], a: 2, cn: "你去过上海吗？",
+        e: "经历提问用 Have you ever...?" },
+      { q: "过去分词 go 是？", opts: ["went", "gone", "goed", "going"], a: 1, cn: "go 的过去分词是什么？",
+        e: "go 的过去分词是 gone。" },
+      { q: "正确的一句？", opts: ["He has did it.", "He has done it.", "He have done it.", "He did done it."], a: 1, cn: "哪一句是正确的？",
+        e: "has + 过去分词 done。" }
     ]
   },
   {
@@ -514,11 +539,16 @@ var GRAMMAR = [
     ],
     err: "✗ Don't to open it.（祈使否定不加 to）　✓ Don't open it.\n✗ Let's to go.（Let's 后接原形）　✓ Let's go.\n✗ Please you sit.（不要加 you）　✓ Please sit.",
     quiz: [
-      { q: "___ the door, please.", opts: ["Open", "Opens", "Opening", "To open"], a: 0, e: "祈使句动词原形开头。" },
-      { q: "___ worry.", opts: ["Don't", "Not", "No", "Doesn't"], a: 0, e: "否定祈使用 Don't + 原形。" },
-      { q: "___ go home.", opts: ["Let's", "Let's to", "Let", "Lets"], a: 0, e: "Let's + 动词原形。" },
-      { q: "___ not try?", opts: ["Why", "Why don't", "How", "What"], a: 1, e: "建议用 Why don't you...? 或 Why not + 原形。" },
-      { q: "正确的一句？", opts: ["Please you sit.", "Sit please you.", "Sit down, please.", "Please to sit."], a: 2, e: "祈使句礼貌加 please，无 you。" }
+      { q: "___ the door, please.", opts: ["Open", "Opens", "Opening", "To open"], a: 0, cn: "请……门。",
+        e: "祈使句动词原形开头。" },
+      { q: "___ worry.", opts: ["Don't", "Not", "No", "Doesn't"], a: 0, cn: "别……。",
+        e: "否定祈使用 Don't + 原形。" },
+      { q: "___ go home.", opts: ["Let's", "Let's to", "Let", "Lets"], a: 0, cn: "我们……回家吧。",
+        e: "Let's + 动词原形。" },
+      { q: "___ not try?", opts: ["Why", "Why don't", "How", "What"], a: 1, cn: "为什么不……呢？",
+        e: "建议用 Why don't you...? 或 Why not + 原形。" },
+      { q: "正确的一句？", opts: ["Please you sit.", "Sit please you.", "Sit down, please.", "Please to sit."], a: 2, cn: "哪一句是正确的？",
+        e: "祈使句礼貌加 please，无 you。" }
     ]
   },
   {
@@ -541,11 +571,16 @@ var GRAMMAR = [
     ],
     err: "✗ Because it rains, so I stay.（because/so 二选一）　✓ It rains, so I stay.\n✗ I like but he.（but 连接两句子）　✓ I like it but he doesn't.\n✗ He is poor and kind.（想转折却用 and）　✓ He is poor but kind.",
     quiz: [
-      { q: "I am tired ___ happy.", opts: ["and", "but", "because", "so"], a: 1, e: "转折用 but。" },
-      { q: "It rains, ___ I stay.", opts: ["because", "so", "but", "and"], a: 1, e: "结果用 so。" },
-      { q: "I stay ___ it rains.", opts: ["so", "because", "but", "and"], a: 1, e: "原因用 because。" },
-      { q: "哪句有错？", opts: ["Tea and coffee.", "I am tired but happy.", "Because it rains, so I stay.", "He is poor but kind."], a: 2, e: "because 与 so 不能同句。" },
-      { q: "He can't go ___ he is busy.", opts: ["so", "but", "because", "and"], a: 2, e: "说明原因用 because。" }
+      { q: "I am tired ___ happy.", opts: ["and", "but", "because", "so"], a: 1, cn: "我很累，……很开心。",
+        e: "转折用 but。" },
+      { q: "It rains, ___ I stay.", opts: ["because", "so", "but", "and"], a: 1, cn: "下雨了，……我留下。",
+        e: "结果用 so。" },
+      { q: "I stay ___ it rains.", opts: ["so", "because", "but", "and"], a: 1, cn: "我留下，……下雨了。",
+        e: "原因用 because。" },
+      { q: "哪句有错？", opts: ["Tea and coffee.", "I am tired but happy.", "Because it rains, so I stay.", "He is poor but kind."], a: 2, cn: "下面哪一句有错误？",
+        e: "because 与 so 不能同句。" },
+      { q: "He can't go ___ he is busy.", opts: ["so", "but", "because", "and"], a: 2, cn: "他去不了，……他很忙。",
+        e: "说明原因用 because。" }
     ]
   },
   {
@@ -568,11 +603,16 @@ var GRAMMAR = [
     ],
     err: "✗ How much books?（可数）　✓ How many books?\n✗ I don't have some.（否定用 any）　✓ I don't have any.\n✗ Do you have some water?（疑问用 any）　✓ Do you have any water?",
     quiz: [
-      { q: "___ books do you have?", opts: ["How much", "How many", "How", "What"], a: 1, e: "可数数量用 how many。" },
-      { q: "___ is it?（问价格）", opts: ["How many", "How much", "How", "What"], a: 1, e: "价格用 how much。" },
-      { q: "I don't have ___ money.", opts: ["some", "any", "many", "a"], a: 1, e: "否定句用 any。" },
-      { q: "Would you like ___ water?", opts: ["any", "some", "many", "much"], a: 1, e: "邀请/期待肯定回答用 some。" },
-      { q: "正确的一句？", opts: ["I have many water.", "I have much apples.", "I have a lot of books.", "I have some book."], a: 2, e: "a lot of 可数不可数通用。" }
+      { q: "___ books do you have?", opts: ["How much", "How many", "How", "What"], a: 1, cn: "你有……书？",
+        e: "可数数量用 how many。" },
+      { q: "___ is it?（问价格）", opts: ["How many", "How much", "How", "What"], a: 1, cn: "这个多少钱？",
+        e: "价格用 how much。" },
+      { q: "I don't have ___ money.", opts: ["some", "any", "many", "a"], a: 1, cn: "我没有……钱。",
+        e: "否定句用 any。" },
+      { q: "Would you like ___ water?", opts: ["any", "some", "many", "much"], a: 1, cn: "你想来点……水吗？",
+        e: "邀请/期待肯定回答用 some。" },
+      { q: "正确的一句？", opts: ["I have many water.", "I have much apples.", "I have a lot of books.", "I have some book."], a: 2, cn: "哪一句是正确的？",
+        e: "a lot of 可数不可数通用。" }
     ]
   },
   {
@@ -595,11 +635,16 @@ var GRAMMAR = [
     ],
     err: "✗ The book is write by him.（用过去分词）　✓ is written\n✗ The book writes by him.（被动需 be）　✓ is written\n✗ The fish eat.（主动误当被动）　✓ The fish was eaten.",
     quiz: [
-      { q: "The book ___ by him.", opts: ["is write", "is written", "writes", "wrote"], a: 1, e: "被动用 be + 过去分词 written。" },
-      { q: "English ___ worldwide.", opts: ["speaks", "is speak", "is spoken", "spoke"], a: 2, e: "被动 is spoken。" },
-      { q: "The door ___ opened.", opts: ["is", "are", "be", "am"], a: 0, e: "单数主语用 is + 过去分词。" },
-      { q: "主动 The cat ate the fish 的被动是？", opts: ["The fish eats.", "The fish is eaten.", "The fish was eaten.", "The fish ate."], a: 2, e: "过去被动用 was + eaten。" },
-      { q: "正确的一句？", opts: ["The meal is cook.", "The meal is cooked.", "The meal cooks.", "The meal cooking."], a: 1, e: "被动 be + 过去分词 cooked。" }
+      { q: "The book ___ by him.", opts: ["is write", "is written", "writes", "wrote"], a: 1, cn: "这本书被他……。",
+        e: "被动用 be + 过去分词 written。" },
+      { q: "English ___ worldwide.", opts: ["speaks", "is speak", "is spoken", "spoke"], a: 2, cn: "英语在全世界被……。",
+        e: "被动 is spoken。" },
+      { q: "The door ___ opened.", opts: ["is", "are", "be", "am"], a: 0, cn: "门被……打开了。",
+        e: "单数主语用 is + 过去分词。" },
+      { q: "主动 The cat ate the fish 的被动是？", opts: ["The fish eats.", "The fish is eaten.", "The fish was eaten.", "The fish ate."], a: 2, cn: "主动句“猫吃了鱼”的被动语态是什么？",
+        e: "过去被动用 was + eaten。" },
+      { q: "正确的一句？", opts: ["The meal is cook.", "The meal is cooked.", "The meal cooks.", "The meal cooking."], a: 1, cn: "哪一句是正确的？",
+        e: "被动 be + 过去分词 cooked。" }
     ]
   },
   {
@@ -622,11 +667,16 @@ var GRAMMAR = [
     ],
     err: "✗ If it will rain, I stay.（if 从句不用 will）　✓ If it rains, I will stay.\n✗ If you will come, we go.（同理）　✓ If you come, we will go.\n✗ If I am rich, I will buy.（正确，但注意主句才 will）　✓ 正确。",
     quiz: [
-      { q: "If it rains, I ___ stay.", opts: ["will", "am", "was", "would"], a: 0, e: "主句用 will，if 从句用现在时。" },
-      { q: "If you ___ hard, you will pass.", opts: ["will study", "study", "studied", "are study"], a: 1, e: "if 从句用一般现在时。" },
-      { q: "___ he comes, we will go.", opts: ["If", "Will", "When", "Because"], a: 0, e: "条件用 If 引导。" },
-      { q: "哪句有错？", opts: ["If you come, we will go.", "If it rains, I will stay.", "If you will call, I answer.", "If I have time, I will help."], a: 2, e: "if 从句不用 will。" },
-      { q: "If I have money, I ___ buy it.", opts: ["will", "am", "was", "do"], a: 0, e: "主句将来用 will。" }
+      { q: "If it rains, I ___ stay.", opts: ["will", "am", "was", "would"], a: 0, cn: "如果下雨，我就留下。",
+        e: "主句用 will，if 从句用现在时。" },
+      { q: "If you ___ hard, you will pass.", opts: ["will study", "study", "studied", "are study"], a: 1, cn: "如果你努力，就会通过。",
+        e: "if 从句用一般现在时。" },
+      { q: "___ he comes, we will go.", opts: ["If", "Will", "When", "Because"], a: 0, cn: "他一来，我们就走。",
+        e: "条件用 If 引导。" },
+      { q: "哪句有错？", opts: ["If you come, we will go.", "If it rains, I will stay.", "If you will call, I answer.", "If I have time, I will help."], a: 2, cn: "下面哪一句有错误？",
+        e: "if 从句不用 will。" },
+      { q: "If I have money, I ___ buy it.", opts: ["will", "am", "was", "do"], a: 0, cn: "如果我有钱，我就买它。",
+        e: "主句将来用 will。" }
     ]
   }
 ];
