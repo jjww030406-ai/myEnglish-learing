@@ -2917,6 +2917,23 @@ h2 { margin: 4px 0 14px; }
 /* ---------- 拼写页：答案亮出后的「🔊 读一遍」按钮（对齐单词旁） ---------- */
 .sp-ans .sp-say { margin: 0 0 0 8px; vertical-align: middle; }
 
+/* ---------- 全站「单词本体」自动补的 🔊 发音按钮 ----------
+   由 decorateSpeak() 在每次渲染后给所有单词元素自动注入，
+   覆盖单词卡 / 今日词 / 错词本 / 词源 / 单词详情 / 拼句卡片 / 逐词释义等，
+   做到「全站任何一个单词点一下就能听真人美音」。按钮内联在单词右侧，小且不抢眼。 */
+.sp-say {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 26px; padding: 0 6px; margin: 0 0 0 6px;
+  border: 1px solid #d7e0f5; border-radius: 999px;
+  background: #f3f7ff; color: #2b6cff; font-size: 13px; line-height: 1;
+  cursor: pointer; vertical-align: middle; transition: background .15s, transform .1s;
+}
+.sp-say:hover { background: #e6eeff; }
+.sp-say:active { transform: scale(.92); }
+/* 单词本体本身也可点（浅色高亮提示可朗读），但不改变原有布局 */
+.wc-word, .tw-word, .detail-w, .et-w, .st-w, .witem > b { cursor: pointer; }
+.wc-word:hover, .tw-word:hover, .detail-w:hover, .et-w:hover, .st-w:hover, .witem > b:hover { color: #2b6cff; }
+
 /* ---------- 拼写页：例句讲解（句子意思 + AI 短语讲解） ---------- */
 .sp-sent { margin-top: 10px; padding: 10px 12px; background: #f8faff; border: 1px solid #e3ebff; border-radius: 10px; }
 .sp-sent-line { font-size: 15px; color: var(--ink, #1f2937); }
