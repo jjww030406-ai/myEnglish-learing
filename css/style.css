@@ -75,10 +75,6 @@ html { scroll-behavior: smooth; }
 .brand { font-size: 21px; font-weight: 800; letter-spacing: .3px;
   background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
   display: inline-flex; align-items: center; gap: 9px; }
-.brand::before {
-  content: "📘"; -webkit-text-fill-color: initial; font-size: 22px;
-  filter: drop-shadow(0 2px 4px rgba(59,109,255,.3));
-}
 .brand .sub { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-left: 4px;
   -webkit-text-fill-color: var(--muted); }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -2802,3 +2798,121 @@ h2 { margin: 4px 0 14px; }
   .film-bar .btn { padding: 8px 11px; font-size: 12.5px; }
   .film-sp { flex-basis: 100%; height: 0; }
 }
+
+/* ===================== 台词精读（📝） ===================== */
+.btn.ghost { background: var(--card); color: var(--muted); border: 1px solid var(--line); }
+.btn.ghost:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-1px); }
+
+.sl-card { padding: 18px; }
+.sl-scenes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.sl-chip {
+  background: var(--grad-soft); border: 1px solid #dde6ff; border-radius: 999px;
+  padding: 6px 13px; font-size: 13px; font-weight: 600; color: var(--brand-d);
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.sl-chip:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.sl-chip.on { background: var(--grad); color: #fff; border-color: transparent; }
+.sl-setting {
+  font-size: 13.5px; line-height: 1.6; color: var(--txt);
+  background: var(--soft); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 14px;
+}
+.sl-setting b { color: var(--brand-d); }
+.sl-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.sl-tab {
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--muted);
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.sl-tab:hover { border-color: var(--brand); color: var(--brand); }
+.sl-tab.on { background: var(--brand); color: #fff; border-color: transparent; }
+
+/* 精读模式 */
+.sl-read-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.sl-lines { display: flex; flex-direction: column; gap: 10px; }
+.sl-line {
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  background: var(--card); transition: border-color .15s, box-shadow .15s;
+}
+.sl-line.is-playing { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand2); }
+.sl-who { font-size: 13px; font-weight: 700; color: var(--brand-d); margin-bottom: 4px; }
+.sl-en { font-size: 17px; font-weight: 700; line-height: 1.6; color: var(--txt); }
+.sl-en .fw, .sl-flash-en .fw {
+  cursor: pointer; border-radius: 6px; padding: 1px 3px; transition: background .12s;
+}
+.sl-en .fw:hover, .sl-flash-en .fw:hover { background: var(--brand2); color: var(--brand-d); }
+.sl-cn { font-size: 14px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.sl-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.sl-mini {
+  background: var(--brand2); border: 1px solid #d4e0ff; color: var(--brand-d);
+  border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: background .12s;
+}
+.sl-mini:hover { background: #dde8ff; }
+.sl-notes { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); display: none; }
+.sl-notes.open { display: block; }
+.sl-note {
+  font-size: 13.5px; color: var(--txt); background: var(--brand2);
+  border-radius: 9px; padding: 7px 11px; margin-top: 6px; line-height: 1.5;
+}
+
+/* 跟读 / 填空 共用 */
+.sl-prog { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+.sl-nav { display: flex; gap: 10px; margin-top: 6px; }
+.sl-tip { margin-top: 10px; }
+
+/* 跟读模式 */
+.sl-flash {
+  background: var(--grad-soft); border: 1px solid #dde6ff; border-radius: 14px;
+  padding: 18px; text-align: center; margin-bottom: 14px;
+}
+.sl-flash-en { font-size: 22px; font-weight: 800; line-height: 1.5; color: var(--txt); }
+.sl-flash-cn { font-size: 15px; color: var(--muted); margin-top: 8px; }
+.sl-shadow-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.sl-kb { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.sl-kb-in {
+  width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 10px;
+  font-family: inherit; font-size: 14px; resize: vertical; margin: 8px 0;
+}
+.sl-said { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+.sl-said-en { font-size: 14px; color: var(--txt); line-height: 1.5; }
+.sl-said-en span { font-weight: 700; }
+.sl-score { font-size: 18px; font-weight: 800; margin-top: 8px; }
+.sl-score.good { color: var(--ok); }
+.sl-score.mid { color: var(--warn); }
+.sl-score.bad { color: var(--bad); }
+.sl-miss { font-size: 13.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.sl-miss b { color: var(--bad); }
+.sl-miss.ok { color: var(--ok); font-weight: 700; }
+
+/* 填空模式 */
+.sl-cloze-en { font-size: 19px; font-weight: 700; line-height: 2; color: var(--txt); margin-bottom: 6px; }
+.sl-blank {
+  width: 86px; padding: 4px 8px; border: 1.5px solid var(--line); border-radius: 8px;
+  font-family: inherit; font-size: 16px; font-weight: 700; text-align: center;
+  background: var(--card); transition: all .12s;
+}
+.sl-blank:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand2); }
+.sl-blank.ok { border-color: var(--ok); background: #e7f7f0; color: var(--ok); }
+.sl-blank.wrong { border-color: var(--bad); background: #fdecec; color: var(--bad); }
+.sl-cn-hint { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+.sl-cloze-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sl-cloze-fb { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.sl-cloze-fb.good { color: var(--ok); }
+.sl-cloze-fb.bad { color: var(--bad); }
+
+@media (max-width: 640px) {
+  .sl-card { padding: 15px 14px; }
+  .sl-en { font-size: 16px; }
+  .sl-flash-en { font-size: 19px; }
+  .sl-cloze-en { font-size: 17px; }
+  .sl-blank { width: 70px; font-size: 15px; }
+}
+
+/* ---------- 拼写页：中文释义暂缺的诚实降级提示 ---------- */
+.sp-cn-miss { color: #b45309; font-size: 20px; font-weight: 700; }
+.sp-def { display: block; font-size: 14px; font-weight: 500; color: var(--muted, #6b7280); margin-top: 6px; line-height: 1.5; }
+.sp-cn .mini { margin-left: 8px; vertical-align: middle; }
+
+/* ---------- 拼写页：答案亮出后的「🔊 读一遍」按钮（对齐单词旁） ---------- */
+.sp-ans .sp-say { margin: 0 0 0 8px; vertical-align: middle; }
