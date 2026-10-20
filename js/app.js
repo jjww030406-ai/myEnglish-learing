@@ -941,7 +941,7 @@ function bind() {
   if (nl) nl.onclick = () => {
     if (lessonIdx < GRAMMAR.length - 1) { lessonIdx++; gqIdx = lessonIdx; initGQuiz(lessonIdx); render(); }
   };
-  document.querySelectorAll("[data-gq]").forEach(b =>
+  document.querySelectorAll('[data-gq*=":"]').forEach(b =>
     b.onclick = () => pickGQuiz(b.dataset.gq.split(":")[0], b.dataset.gq.split(":")[1]));
   const gqs = $("#gqSubmit"); if (gqs) gqs.onclick = submitGQuiz;
   const gqr = $("#gqRedo");
@@ -2639,6 +2639,10 @@ function viewEtymon() {
 
 /* ---------- 语法课 ---------- */
 /* ---------- 语法「每日一练」：5 道选择题，题目云端动态生成，答完给答案+解析 ---------- */
+/* 把题干里的空格（___ / ____ / ＿＿，数量不定）统一渲染成「单个」下划线空档 */
+function blankify(s, spanCls) {
+  return String(s || "").replace(/＿+|_+/g, '<span class="' + (spanCls || "gq-blank") + '">＿</span>');
+}
 function grammarDailyBlock() {
   var G = window.GrammarQuiz;
   if (!G) return "";
@@ -2652,12 +2656,12 @@ function grammarDailyBlock() {
         var picked = st.picked[qi];
         var ok = picked === q.a;
         return `<div class="gq-item">
-          <div class="gq-q">${qi + 1}. ${String(q.q).replace(/＿+|___+/g, '<span class="gq-blank">＿＿</span>')}</div>
+          <div class="gq-q">${qi + 1}. ${blankify(q.q)}</div>
           <div class="gq-opts">
             ${q.opts.map(function (o, k) {
-              var cls = "btn";
-              if (st.checked) { if (k === q.a) cls += " good"; else if (picked === k) cls += " bad"; }
-              else if (picked === k) cls += " on";
+              var cls = "opt";
+              if (st.checked) { if (k === q.a) cls += " right"; else if (picked === k) cls += " wrong"; }
+              else if (picked === k) cls += " picked";
               return `<button class="${cls}" data-gq="${qi}" data-gk="${k}"${st.checked ? " disabled" : ""}>${"ABCD"[k] || (k + 1)}. ${o}</button>`;
             }).join("")}
           </div>
@@ -2835,7 +2839,7 @@ function quizBlock(i) {
         ${quiz.map((q, n) => {
           const ok = st.picks[n] === q.a;
           return `<div class="gq-item ${ok ? "ok" : "bad"}">
-            <div class="gq-q">${n + 1}. ${q.q}</div>
+            <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
             ${!ok ? `<div class="gq-your">你的答案：<s>${q.opts[st.picks[n]] ?? "未作答"}</s></div>` : ""}
             <div class="gq-right">正确答案：<b>${q.opts[q.a]}</b></div>
             <div class="gq-e">${q.e}</div>
@@ -2853,7 +2857,7 @@ function quizBlock(i) {
         const ok = judged && picked === q.a;
         return `
       <div class="gq-item ${judged ? (ok ? "ok" : "bad") : "pending"}" id="gqItm${n}">
-        <div class="gq-q">${n + 1}. ${q.q}</div>
+        <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
         <div class="gq-opts">
           ${q.opts.map((o, k) => {
             let cls = "opt";
@@ -3250,7 +3254,7 @@ function phrasalTestBlock() {
   return `
   <div class="card ph-test">
     <div class="pht-head">🧪 固定搭配专练 · 第 ${phTest.qi + 1} / ${phTest.list.length} 题　已对 ${phTest.right}</div>
-    <p class="pht-q">${it.s.replace(/＿＿+|___+/, '<span class="pht-blank">＿＿</span>')}</p>
+    <p class="pht-q">${blankify(it.s, "pht-blank")}</p>
     ${it.cn ? `<p class="muted" style="margin:-6px 0 12px;">${it.cn}</p>` : ""}
     <div class="pht-opts">
       ${opts.map(function (o, k) {
