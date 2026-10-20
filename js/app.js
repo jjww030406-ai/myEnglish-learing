@@ -2644,6 +2644,12 @@ function viewEtymon() {
 function blankify(s, spanCls) {
   return String(s || "").replace(/＿+|_+/g, '<span class="' + (spanCls || "gq-blank") + '">&nbsp;</span>');
 }
+/* 取语法题的整句中文：优先用题自带 cn，装配丢失时按题干文本查表回退 */
+function quizCn(q) {
+  if (q && q.cn) return q.cn;
+  if (q && window.QUIZ_CN && QUIZ_CN[q.q]) return QUIZ_CN[q.q];
+  return "";
+}
 function grammarDailyBlock() {
   var G = window.GrammarQuiz;
   if (!G) return "";
@@ -2666,7 +2672,7 @@ function grammarDailyBlock() {
         var ok = picked === q.a;
         return `<div class="gq-item">
           <div class="gq-q">${qi + 1}. ${blankify(q.q)}</div>
-          ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
+          ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
           <div class="gq-opts">
             ${q.opts.map(function (o, k) {
               var cls = "opt";
@@ -2850,7 +2856,7 @@ function quizBlock(i) {
           const ok = st.picks[n] === q.a;
           return `<div class="gq-item ${ok ? "ok" : "bad"}">
             <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
-            ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
+            ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
             ${!ok ? `<div class="gq-your">你的答案：<s>${q.opts[st.picks[n]] ?? "未作答"}</s></div>` : ""}
             <div class="gq-right">正确答案：<b>${q.opts[q.a]}</b></div>
             <div class="gq-e">${q.e}</div>
@@ -2869,7 +2875,7 @@ function quizBlock(i) {
         return `
       <div class="gq-item ${judged ? (ok ? "ok" : "bad") : "pending"}" id="gqItm${n}">
         <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
-        ${q.cn ? `<div class="gq-cn">${q.cn}</div>` : ""}
+        ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
         <div class="gq-opts">
           ${q.opts.map((o, k) => {
             let cls = "opt";
