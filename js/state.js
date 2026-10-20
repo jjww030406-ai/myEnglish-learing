@@ -184,10 +184,12 @@ function normalize(d) {
   const str = (v, dflt) => (typeof v === "string" && v) ? v : dflt;
 
   const learnedArr = arr(d.learned).filter(x => typeof x === "string");
-  // 今天具体学了哪些词：新字段。老数据没有它时，若今天已学且日期仍是今天，
-  // 先用「已学会的词」顶上（个人学习者基本就是今天学的），避免清单空着。
+  // 今天具体学了哪些词：新字段。只对「从来没有过 todayWords 字段」的老数据做一次性迁移
+  // —— 用已学会的词顶上，避免老用户清单空着。
+  // ⚠️ 关键：字段存在但为空数组 [] 时（说明今天确实还没学），绝不能回填，否则
+  // 「今日已学单词」会显示成累计数，造成「一打开网站就学了 N 个词」的错觉。
   let todayWords = arr(d.todayWords).filter(x => typeof x === "string");
-  if (todayWords.length === 0 && str(d.date, today()) === today() && learnedArr.length > 0) {
+  if (todayWords.length === 0 && d.todayWords === undefined && str(d.date, today()) === today() && learnedArr.length > 0) {
     todayWords = learnedArr.slice();
   }
 
