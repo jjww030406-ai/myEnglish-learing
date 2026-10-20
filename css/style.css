@@ -402,6 +402,7 @@ p, li { font-size: 14px; line-height: 1.75; }
 .gquiz { border-top: 4px solid var(--warn); }
 .gquiz.blind .gq-opts { filter: blur(5px); opacity: .4; }
 .gq-item { padding: 14px 0; border-bottom: 1px dashed var(--line); }
+.gq-cn { margin: 4px 0 8px; font-size: 13px; color: var(--muted); line-height: 1.6; }
 .gq-item:last-of-type { border-bottom: none; }
 .gq-q { font-size: 15px; font-weight: 600; margin-bottom: 9px; }
 .gq-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
