@@ -2549,6 +2549,12 @@ h2 { margin: 4px 0 14px; }
 }
 .gq-head .muted { font-size: 12px; font-weight: 600; }
 .gq-card > p.muted { margin: 0 0 16px; font-size: 13px; line-height: 1.7; }
+.gq-focus {
+  background: var(--brand2); border: 1px solid var(--brand-line, #dfe7ff);
+  border-radius: 12px; padding: 12px 14px; margin: 4px 0 14px;
+  font-size: 13px; line-height: 1.75; color: var(--ink);
+}
+.gq-focus b { color: var(--brand); }
 
 .gq-item {
   padding: 16px 18px; margin-bottom: 12px;
