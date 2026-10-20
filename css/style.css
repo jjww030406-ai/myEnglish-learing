@@ -2916,3 +2916,12 @@ h2 { margin: 4px 0 14px; }
 
 /* ---------- 拼写页：答案亮出后的「🔊 读一遍」按钮（对齐单词旁） ---------- */
 .sp-ans .sp-say { margin: 0 0 0 8px; vertical-align: middle; }
+
+/* ---------- 拼写页：例句讲解（句子意思 + AI 短语讲解） ---------- */
+.sp-sent { margin-top: 10px; padding: 10px 12px; background: #f8faff; border: 1px solid #e3ebff; border-radius: 10px; }
+.sp-sent-line { font-size: 15px; color: var(--ink, #1f2937); }
+.sp-sent-line b { color: var(--brand-d, #3b6dff); }
+.sp-sent-cn { margin-top: 5px; font-size: 14.5px; color: #16a34a; font-weight: 600; }
+.sp-sent-out { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d7e2ff; font-size: 14px; line-height: 1.65; }
+.sp-sent-out p { margin: 4px 0; }
+.sp-sent-out b { color: var(--brand-d, #3b6dff); }
