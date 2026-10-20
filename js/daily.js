@@ -55,6 +55,36 @@
    "shall been over under into about after before between during without within against off above below").split(" ")
     .forEach(function (w) { STOP[w] = 1; });
 
+  // 一个词能不能进「拼写/生词」体系：必须全小写、2~12 字母、且不是虚词黑名单。
+  // 首字母大写的基本是专有名词（人名、地名、品牌），不该当"要背的单词"来考拼写
+  // —— 比如 John / Mary / Tom。这一关既挡住新词生成，也用来清洗历史脏数据。
+  function isSpellable(w) {
+    return w && /^[a-z]{2,12}$/.test(w) && !STOP[w] && !NAMES[w];
+  }
+
+  // 常见英文名 / 姓氏黑名单：这些词基本只作专有名词用，不该当"要背的单词"考拼写
+  // （john / mary / tom 这类）。注意只收「几乎不当普通英文词用」的名字，避免误伤
+  // will / rose / mark / joy 这种本身也是常用词的词。共享上传前也会过这一关，
+  // 不让人名再写进云端共享表污染其他用户。
+  var NAMES = {};
+  ("john mary james robert michael david william richard joseph thomas charles christopher " +
+   "daniel matthew anthony paul andrew joshua kenneth kevin brian george edward ronald timothy " +
+   "jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon " +
+   "benjamin samuel gregory alexander patrick jack dennis jerry tyler aaron henry douglas peter " +
+   "adam nathan zachary kyle noah ethan jeremy walter christian keith roger terry sean gerald " +
+   "harold jeremiah lawrence arthur jesse bryan joe jordan billy bruce albert willie gabriel " +
+   "logan alan juan wayne roy ralph randy eugene vincent russell louis philip bobby johnny " +
+   "bradley patricia jennifer linda elizabeth barbara susan jessica sarah karen nancy lisa betty " +
+   "margaret sandra ashley dorothy kimberly emily donna michelle carol amanda melissa deborah " +
+   "stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma " +
+   "nicole helen samantha katherine christine debbie rachel carolyn janet catherine maria heather " +
+   "diane olivia julie joyce victoria kelly christina lauren joan evelyn judith megan cheryl " +
+   "andrea hannah martha jacqueline frances charlotte fred sam tom jim bob ron ted dan " +
+   "smith johnson williams brown jones miller davis garcia rodriguez wilson martinez anderson " +
+   "thompson harris sanchez lewis robinson torres nguyen flores adams nelson rivera campbell " +
+   "mitchell roberts").split(" ")
+    .forEach(function (w) { NAMES[w] = 1; });
+
   /* ---------------- 工具 ---------------- */
   function localDateStr(d) {
     d = d || new Date();
@@ -125,6 +155,7 @@
   }
 
   /* ---------------- 网络：免费翻译 API（中文兜底，零依赖、无需 key、CORS 开放） ---------------- */
+  function hasCJK(s) { return /[\u4e00-\u9fff]/.test(String(s || "")); }
   async function fetchCn(w) {
     try {
       var r = await fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(w) + "&langpair=en|zh-CN");
@@ -132,7 +163,12 @@
       var d = await r.json();
       var t = d && d.responseData && d.responseData.translatedText;
       // 过滤掉配额/警告占位文本；正常中文释义才采用
-      if (t && d.responseStatus === 200 && !/MYMEMORY|QUOTA|WARNING|WE COULD NOT/i.test(t)) return String(t).trim();
+      if (t && d.responseStatus === 200 && !/MYMEMORY|QUOTA|WARNING|WE COULD NOT/i.test(t)) {
+        var s = String(t).trim();
+        // ⚠️ 关键校验：mymemory 查不到译文时会「原样返回英文单词」（如 digital → digital），
+        // 不校验就会把英文词当成中文释义存进词库。必须是真中文、且不等于原词才采用。
+        if (hasCJK(s) && s.toLowerCase() !== String(w).toLowerCase()) return s;
+      }
       return null;
     } catch (e) { return null; }
   }
@@ -166,14 +202,17 @@
       }
     } catch (e) { return null; }
     var j = extractJSON(answer);
-    if (!j.cn) return null;
+    // AI 偶尔也会漏出英文，必须校验是真中文才采用
+    if (!j.cn || !hasCJK(j.cn)) return null;
     return { cn: j.cn, pos: j.pos || dict.pos || "", s: j.s || dict.ex || dict.def || dict.w, sentCn: j.sentCn || "" };
   }
 
   // 合成一个单词条目：优先种子，其次大模型，最后英文释义兜底
   function assemble(w, dict, extra) {
     dict = dict || {}; extra = extra || {};
-    var cn = extra.cn || (dict.def ? dict.def : "（暂无释义）");
+    // 中文释义只接受真中文；拿不到就留空（界面上会提示「暂无中文释义」），
+    // 绝不把英文释义 / 英文单词本身冒充中文 —— 否则「看中文拼英文」根本没法做。
+    var cn = (extra.cn && hasCJK(extra.cn)) ? extra.cn : "";
     var s = extra.s || dict.ex || (dict.def ? ("e.g. " + dict.def) : w);
     return {
       w: w,
@@ -212,6 +251,9 @@
   }
   async function sbUpsert(words) {
     if (!SYNC.enabled || !SYNC.url || !words.length) return;
+    // 上传前先过滤：只共享"真能拼写"的词典词，绝不把名字/专有名词写进共享表污染所有人
+    words = (words || []).filter(function (x) { return x && isSpellable(x.w); });
+    if (!words.length) return;
     try {
       // 读出已有共享词，合并新词后整行写回（保留主键那一行）
       var r = await fetch(SYNC.url + "/rest/v1/learning_progress?profile_id=eq." + SHARED_KEY + "&select=data", { headers: sbHeaders() });
@@ -230,7 +272,18 @@
   /* ---------------- 装配全局 WORDS（基础 + 种子 + 本地/云端生成） ---------------- */
   function applyWords(lib) {
     var seen = {}, out = [];
-    function add(w) { if (w && w.w && !seen[w.w]) { seen[w.w] = 1; out.push(w); } }
+    function add(w) {
+      if (!w || !w.w || seen[w.w]) return;
+      // 人名 / 专有名词（首字母大写的 John/Mary/Tom 之类）不是"要背的单词"，
+      // 一律不进拼写体系。这条同时清洗「云端共享词库 / 本地存档」里已被污染的人名。
+      if (!isSpellable(w.w)) return;
+      seen[w.w] = 1;
+      // 历史脏数据清洗：早期版本可能把「翻译 API 原样返回的英文」存成了中文释义
+      // （如 digital 的 cn 就是 "digital"）。凡是不含真中文的释义一律清空，
+      // 界面会显示「暂无中文释义」，比拿英文冒充中文诚实。
+      if (w.cn && !hasCJK(w.cn)) w.cn = "";
+      out.push(w);
+    }
     // 云端共享 / 本地累积的词优先（运行时动态抓取、逐日扩充的部分）
     (lib || []).forEach(add);
     // 以下为离线兜底：断网或云端不可达时才用，绝不写死上限
@@ -241,6 +294,12 @@
       add({ w: k, ph: s.ph || "", cn: s.cn, s: s.s, sentCn: s.sentCn || "", pos: s.pos || "", src: "seed" });
     });
     WORDS = out;
+    // 顺手把「已学会的词 / 今日已学单词」里可能混进去的人名脏词清掉，
+    // 不然首页进度、单词卡还会把 John 这类当已掌握单词秀出来。
+    if (typeof S !== "undefined" && S) {
+      if (Array.isArray(S.learned)) S.learned = S.learned.filter(function (x) { return isSpellable(x); });
+      if (Array.isArray(S.todayWords)) S.todayWords = S.todayWords.filter(function (x) { return isSpellable(x); });
+    }
   }
 
   /* ---------------- 口语（PHRASES）动态装配：基础72 + 分级语料 + 云端共享 ----------------
