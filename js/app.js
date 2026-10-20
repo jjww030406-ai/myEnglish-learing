@@ -2816,6 +2816,10 @@ function lessonPage(i) {
 /* ---------- 课末测验 ---------- */
 /* 确保某课的作答记录已存在（首次进入时调用） */
 /* 有效测验题：把「用户已答对过的原题」换成云端换题库里的题（按课标题取），实现不重复 */
+/* 题干指纹：忽略大小写/空格/标点，下划线空位替换成固定占位符（保留位置信息），用于判重 */
+function qFingerprint(s) {
+  return String(s || "").toLowerCase().replace(/＿+|_+/g, " blank ").replace(/[^a-z0-9]+/g, "");
+}
 function buildEffQuiz(i) {
   const g = GRAMMAR[i];
   if (!g) return [];
@@ -2823,11 +2827,41 @@ function buildEffQuiz(i) {
   const st = gqState[i];
   const rightSet = (st && st.rightSet) || {};
   const bank = (window.GQUIZ_BANK && window.GQUIZ_BANK[g.t]) || [];
-  let bi = 0;
-  return base.map(function (q, n) {
-    if (rightSet[n] && bank.length) { const rep = bank[bi % bank.length]; bi++; return rep; }
-    return q;
+  // ①登记「不换掉的原题」题干指纹——换进来的新题不许和它们撞题
+  // ②统计题内重复（同一题干出现多次时，只保留第一次，其余尝试换题）
+  const keepFp = {}, dupCount = {};
+  base.forEach(function (q, n) {
+    if (!rightSet[n]) {
+      const k = qFingerprint(q && q.q);
+      if (k) { keepFp[k] = 1; dupCount[k] = (dupCount[k] || 0) + 1; }
+    }
   });
+  const used = new Array(bank.length).fill(false);
+  const eff = base.map(function (q) { return q; });
+  // 第一趟：已答对的槽位 → 换一道没出现过、不与保留原题撞题的题库新题
+  base.forEach(function (q, n) {
+    if (!rightSet[n]) return;
+    for (let b = 0; b < bank.length; b++) {
+      const rk = qFingerprint(bank[b] && bank[b].q);
+      if (rk && !keepFp[rk] && !used[b]) { used[b] = true; eff[n] = bank[b]; return; }
+    }
+    // 题库没有干净的新题 → 保留原题，并登记指纹（后续换题不许与它撞）
+    keepFp[qFingerprint(q && q.q)] = 1;
+  });
+  // 第二趟：题内自带重复的槽位（云端课题库可能带进来）→ 只留第一道，其余尝试换题
+  const appeared = {};
+  base.forEach(function (q, n) {
+    if (rightSet[n]) return;                      // 第一趟已处理
+    const k = qFingerprint(q && q.q);
+    if (k && appeared[k]) {
+      for (let b = 0; b < bank.length; b++) {
+        const rk = qFingerprint(bank[b] && bank[b].q);
+        if (rk && !keepFp[rk] && !used[b]) { used[b] = true; eff[n] = bank[b]; return; }
+      }
+    }
+    appeared[k] = (appeared[k] || 0) + 1;
+  });
+  return eff;
 }
 function initGQuiz(i) {
   if (!GRAMMAR[i]) return null;
