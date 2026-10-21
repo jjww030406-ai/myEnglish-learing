@@ -234,6 +234,7 @@ p, li { font-size: 14px; line-height: 1.75; }
   background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .wc-side { display: flex; flex-direction: column; gap: 4px; }
 .wc-ph { font-size: 16px; color: var(--brand); }
+.wc-ph.ph-empty, .sp-ph.ph-empty, .detail-ph.ph-empty, .et-ph.ph-empty { color: var(--muted); font-weight: 400; font-size: 13px; }
 .wc-cn { font-size: 24px; font-weight: 700; color: var(--txt); }
 .wc-ex {
   background: #f8faff; border: 1px solid var(--line); border-radius: 10px;
