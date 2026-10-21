@@ -1201,7 +1201,7 @@ function bind() {
         e.preventDefault(); safe2(showSentAnswer, "显示答案"); return;
       }
       if (e.key === "r" || e.key === "R" || e.code === "KeyR") {
-        e.preventDefault(); safe2(() => { stDone = []; stFinished = false; stErrThis = 0; render(); }, "重打本句"); return;
+        e.preventDefault(); safe2(() => { stDone = []; stFinished = false; stFinishedAt = 0; stErrThis = 0; render(); }, "重打本句"); return;
       }
       return;
     }
@@ -1220,9 +1220,11 @@ function bind() {
       }
     }
     if (view === "sent" && stList.length) {
-      // 整句拼完：空格 / 回车 → 下一句
+      // 整句拼完：空格 / 回车 → 下一句（拼完 700ms 内不响应，防止提交最后一词的连击把解析结果跳没）
       if (stFinished && (e.key === " " || e.key === "Spacebar" || e.key === "Enter")) {
-        e.preventDefault(); safe2(sentNext, "下一句"); return;
+        e.preventDefault();
+        if (Date.now() - stFinishedAt > 700) safe2(sentNext, "下一句");
+        return;
       }
     }
     if (view === "quiz" && qiList.length) {
@@ -1246,7 +1248,7 @@ function bind() {
   document.querySelectorAll("[data-act='stNext']").forEach(b =>
     b.onclick = () => sentNext());
   document.querySelectorAll("[data-act='stAgain']").forEach(b =>
-    b.onclick = () => { stDone = []; stFinished = false; stErrThis = 0; render(); });
+    b.onclick = () => { stDone = []; stFinished = false; stFinishedAt = 0; stErrThis = 0; render(); });
   document.querySelectorAll("[data-act='stSay']").forEach(b =>
     b.onclick = () => { if (stList.length) speak(stList[stIdx].en); });
   document.querySelectorAll("[data-act='stHint']").forEach(b =>
@@ -4337,11 +4339,64 @@ var stCombo = 0;     // 当前连对（跨句累计，出错清零）
 var stPerfect = 0;   // 本轮 Perfect 次数
 var stRoundScore = 0;// 本轮得分
 var stFinished = false;  // 当前句是否拼完
+var stFinishedAt = 0;    // 拼完的时间戳：防止连按 Enter 瞬间跳过解析结果
 var stErrThis = 0;   // 本句错误次数
 
 function stRoleClass(role) {
   return { "主语": "st-subj", "谓语": "st-pred", "宾语": "st-obj",
            "定语": "st-attr", "状语": "st-adv", "补语": "st-comp" }[role] || "st-other";
+}
+
+/* 整句拼完后的「句子成分解析」面板：
+   ① 判断句型（主系表/主谓宾/主谓/祈使句）② 按成分分组列出每个词 ③ 给一句记忆讲解 */
+function stAnalysisHtml(s) {
+  const ws = s.words || [];
+  const isBe = w => /^(am|is|are|was|were|be|been|being)$/i.test(String(w.w).trim());
+  const has = r => ws.some(w => w.role === r);
+  // ① 句型判断
+  let struct = "简单句";
+  if (has("主语") && has("谓语")) {
+    if (ws.some(w => w.role === "谓语" && isBe(w)) && has("补语")) struct = "主系表结构";
+    else if (has("宾语")) struct = "主谓宾结构";
+    else struct = "主谓结构";
+  } else if (!has("主语")) struct = "祈使句";
+  // ② 结构总览徽章（相邻同成分合并成一块）
+  const blocks = [];
+  ws.forEach(w => {
+    const last = blocks[blocks.length - 1];
+    if (last && last.role === w.role) last.n++;
+    else blocks.push({ role: w.role, n: 1 });
+  });
+  const badgeHtml = blocks.map(b =>
+    `<span class="st-struct-badge ${stRoleClass(b.role)}">${b.role}${b.n > 1 ? ` ×${b.n}` : ""}</span>`
+  ).join(`<i class="st-plus">+</i>`);
+  // ③ 分成分明细行（保持句中首次出现顺序）
+  const groups = [];
+  ws.forEach(w => {
+    let g = groups.find(x => x.role === w.role);
+    if (!g) { g = { role: w.role, items: [] }; groups.push(g); }
+    g.items.push(w);
+  });
+  const rows = groups.map(g => `
+    <div class="st-an-row ${stRoleClass(g.role)}">
+      <span class="st-an-role">${g.role}</span>
+      <span class="st-an-words">${g.items.map(w => `<b>${esc(w.w)}</b><span>${esc(w.cn)}</span>`).join("　")}</span>
+    </div>`).join("");
+  // ④ 讲解要点（按本句出现的成分挑着讲）
+  const tips = [];
+  if (has("主语")) tips.push("<b>主语</b>是句子说的人或物，一般放最前面");
+  if (has("谓语")) tips.push("<b>谓语</b>是动作或状态，时态变化都发生在它身上");
+  if (has("宾语")) tips.push("<b>宾语</b>是动作的承受者，跟在动词后面");
+  if (has("补语")) tips.push("<b>补语（表语）</b>跟在 be 动词后，说明主语「是什么 / 怎么样」");
+  if (has("定语")) tips.push("<b>定语</b>修饰名词，让意思更具体");
+  if (has("状语")) tips.push("<b>状语</b>补充时间、地点或方式，位置最灵活");
+  return `
+  <div class="st-analysis">
+    <div class="st-an-head">🔍 句子成分解析 <span class="st-an-struct">${struct}</span></div>
+    <div class="st-an-badges">${badgeHtml}</div>
+    ${rows}
+    ${tips.length ? `<p class="st-an-tips">💡 ${tips.join("；")}。</p>` : ""}
+  </div>`;
 }
 
 function startSentRound() {
@@ -4350,7 +4405,7 @@ function startSentRound() {
   }
   stList = SENTENCES.slice().sort(() => Math.random() - .5).slice(0, 8);
   stIdx = 0; stCombo = 0; stPerfect = 0; stRoundScore = 0;
-  stDone = []; stFinished = false; stErrThis = 0;
+  stDone = []; stFinished = false; stFinishedAt = 0; stErrThis = 0;
   render();
 }
 
@@ -4364,6 +4419,7 @@ function showSentAnswer() {
   stCombo = 0; stErrThis++;
   if (stDone.length >= s.words.length) {
     stFinished = true;
+    stFinishedAt = Date.now();
     S.stars++;
     try {
       if (!Array.isArray(S.sentDone)) S.sentDone = [];
@@ -4378,7 +4434,7 @@ function sentNext() {
   if (!stList.length) return;
   if (stIdx >= stList.length - 1) { stIdx = stList.length; render(); return; }  // 本轮结束
   stIdx++;
-  stDone = []; stFinished = false; stErrThis = 0;
+  stDone = []; stFinished = false; stFinishedAt = 0; stErrThis = 0;
   render();
 }
 
@@ -4407,6 +4463,7 @@ function submitSentWord(inp) {
     if (stDone.length >= s.words.length) {
       // 整句拼完：Perfect（零失误额外加分）+ ⭐ + 记录
       stFinished = true;
+      stFinishedAt = Date.now();
       if (stErrThis === 0) { stPerfect++; stRoundScore += 50; }
       S.stars++;
       try {
@@ -4499,6 +4556,7 @@ function viewSent() {
     ${stFinished ? `
       <div class="st-perfect">${stErrThis === 0 ? (stCombo >= 3 ? `Perfect ×${stCombo}` : "Perfect!") : "拼完啦！"}</div>
       <p class="st-cn-final">${esc(s.cn)}</p>
+      ${stAnalysisHtml(s)}
       <div class="ctrls">
         <button class="btn primary" data-act="stNext">${stIdx >= stList.length - 1 ? "看本轮结果 →" : "下一句 →"}</button>
       </div>
