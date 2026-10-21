@@ -180,6 +180,24 @@
       return { w: w, ph: ph, pos: pos, def: def0.definition || "", ex: def0.example || "" };
     } catch (e) { return null; }
   }
+  /* 只抓音标（单词卡 / 拼写页按需补音标用）。复用 dictionaryapi.dev（真实浏览器带 CORS）。
+     返回音标字符串；查不到或网络异常返回 ""（调用方据此决定是否显示占位）。 */
+  async function fetchPh(w) {
+    try {
+      var r = await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(String(w).toLowerCase()));
+      if (!r.ok) return "";
+      var arr = await r.json(), first = arr[0] || {};
+      return (first.phonetics || []).map(function (p) { return p.text; }).find(Boolean) || "";
+    } catch (e) { return ""; }
+  }
+  /* 把抓到的音标写回本地词库，永久保存（下次打开不用再抓） */
+  function savePh(w, ph) {
+    try {
+      var lib = readLib();
+      for (var i = 0; i < lib.length; i++) { if (lib[i].w === w) { lib[i].ph = ph; break; } }
+      saveLib(lib);
+    } catch (e) {}
+  }
 
   /* ---------------- 网络：免费翻译 API（中文兜底，零依赖、无需 key、CORS 开放） ---------------- */
   function hasCJK(s) { return /[\u4e00-\u9fff]/.test(String(s || "")); }
@@ -659,7 +677,7 @@
     loadDailyWords: loadDailyWords, loadDailyPhrases: loadDailyPhrases,
     loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar, loadDailyPhrasals: loadDailyPhrasals, loadDailyGQuiz: loadDailyGQuiz,
     pickDaily: pickDaily, extractJSON: extractJSON,
-    localDateStr: localDateStr, fetchDict: fetchDict, genCn: genCn,
+    localDateStr: localDateStr, fetchDict: fetchDict, fetchPh: fetchPh, savePh: savePh, genCn: genCn,
     applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar, applyPhrasals: applyPhrasals
   };
   if (typeof module !== "undefined" && module.exports) {
