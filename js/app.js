@@ -555,6 +555,24 @@ window.refreshLibBadge = function () {
   el.title = tip;
   b.textContent = tail;
 };
+/* 按需补音标：词没音标时后台抓 dictionaryapi.dev（真实浏览器带 CORS），
+   抓到后就地填进页面所有同词音标节点（不整页重绘，避免闪），并写回本地词库永久保存。 */
+var __phCache = {};
+function ensurePh(w) {
+  if (!w || !w.w || w.ph) return;                       // 已有音标
+  if (Object.prototype.hasOwnProperty.call(__phCache, w.w)) return;   // 已查过（有/无都不再查）
+  __phCache[w.w] = "";                                  // 标记“已查/查无”，避免重复请求
+  if (!window.DailyEngine || !window.DailyEngine.fetchPh) return;
+  window.DailyEngine.fetchPh(w.w).then(function (ph) {
+    if (!ph) return;
+    __phCache[w.w] = ph; w.ph = ph;
+    try { if (window.DailyEngine.savePh) window.DailyEngine.savePh(w.w, ph); } catch (e) {}
+    try {
+      var sel = '[data-phw="' + (window.CSS && CSS.escape ? CSS.escape(w.w) : w.w) + '"]';
+      document.querySelectorAll(sel).forEach(function (el) { el.textContent = ph; el.classList.remove("ph-empty"); });
+    } catch (e) {}
+  }).catch(function () {});
+}
 
 /* 每日单词状态横幅：状态已并入顶栏的「词库」徽章，这里不再单独显示 */
 /* ---------- 吉祥物互动 ----------
@@ -1982,6 +2000,7 @@ function viewReview() {
 function viewCards() {
   curCard = WORDS[currentWordIndex()];
   const w = curCard;
+  ensurePh(w);                                           // 没音标就后台补，抓到就地填
   return `
   <h2>单词卡</h2>
   <p class="muted">意思、例句、句意、词源全部直接显示，不用点任何按钮。</p>
@@ -1992,7 +2011,7 @@ function viewCards() {
       <div class="wc-word">${w.w}</div>
       ${(w._today && w._today === window.TODAY_STR) ? '<span class="today-badge">🌐 今日新词</span>' : ""}
       <div class="wc-side">
-        <div class="wc-ph">${w.ph}</div>
+        <div class="wc-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
         <div class="wc-cn">${w.cn}</div>
       </div>
     </div>
@@ -2280,6 +2299,7 @@ function viewSpell() {
   const w = spWord;
   const mode = SPELL_MODES.find(m => m.id === spMode);
   const len = w.w.length;
+  ensurePh(w);                                           // 没音标就后台补，抓到就地填
 
   // 提示区：按模式决定给多少信息
   let prompt = "";
@@ -2291,13 +2311,15 @@ function viewSpell() {
       `${w.def ? `<span class="sp-def">英文提示：${esc(w.def)}</span>` : ""}` +
       ` <button class="mini" onclick="speak('${w.w.replace(/'/g, "\\'")}')">🔊 听发音猜词</button>`;
   if (spMode === "cn") {
-    prompt = `<div class="sp-cn">${cnOrFallback()}</div>
+    prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
+      <div class="sp-cn">${cnOrFallback()}</div>
       <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>`;
   } else if (spMode === "letter") {
-    prompt = `<div class="sp-cn">中文意思：${cnOrFallback()}</div>
+    prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
+      <div class="sp-cn">中文意思：${cnOrFallback()}</div>
       <p class="ex">共 <b>${len}</b> 个字母，首字母是 <b class="big-first">${w.w[0]}</b></p>`;
   } else {
-    prompt = `<div class="sp-ph">${w.ph}</div>
+    prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
       <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>
       <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 听例句</button>
       <button class="mini" onclick="startSpeechText('${w.s.replace(/'/g, "\\'")}', 'sp')">🎤 跟读</button>
@@ -2563,11 +2585,12 @@ function spRetryCheck() {
 }
 /* ---------- 词源详解 ---------- */
 function viewWordDetail(w) {
+  ensurePh(w);
   return `
   <div class="card detail">
     <div class="detail-head">
       <span class="detail-w">${w.w}</span>
-      <span class="detail-ph">${w.ph}</span>
+      <span class="detail-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</span>
       <span class="detail-cn">${w.cn}</span>
     </div>
     ${w.pos ? `<p class="detail-meta"><b>词性</b>${w.pos}${w.plural ? `　<b>复数</b>${w.plural}` : ""}</p>` : ""}
@@ -2651,7 +2674,7 @@ function viewEtymon() {
       <summary>
         <span class="et-w">${w.w}</span>
         <span class="et-cn">${w.cn}</span>
-        <span class="et-ph">${w.ph}</span>
+        <span class="et-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || ""}</span>
         ${w.pos ? `<span class="et-pos">${w.pos}</span>` : ""}
       </summary>
       ${w.senses ? `<h4>💬 其他常见用法</h4><p class="why">${w.senses}</p>` : ""}
