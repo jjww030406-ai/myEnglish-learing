@@ -2984,3 +2984,52 @@ h2 { margin: 4px 0 14px; }
 .sp-sent-out { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d7e2ff; font-size: 14px; line-height: 1.65; }
 .sp-sent-out p { margin: 4px 0; }
 .sp-sent-out b { color: var(--brand-d, #3b6dff); }
+
+/* ===================== 首页：0 基础学习路径分组 ===================== */
+.path-lead { margin: 18px 2px 6px; font-size: 14.5px; color: #44506a; line-height: 1.6; }
+.path-lead b { color: #2b6cff; }
+.path-group { margin: 16px 0; }
+.pg-head { display: flex; align-items: baseline; gap: 10px; margin: 4px 2px 10px; flex-wrap: wrap; }
+.pg-tag { font-size: 16px; font-weight: 800; color: #fff; background: linear-gradient(135deg,#3b6dff,#6aa0ff); padding: 3px 12px; border-radius: 999px; box-shadow: 0 2px 8px rgba(59,109,255,.25); }
+.pg-tip { font-size: 13.5px; color: var(--muted, #6b7280); }
+
+/* ===================== 字母启蒙 ===================== */
+.alpha-wrap { padding: 4px 2px 20px; }
+.alpha-lead { font-size: 14.5px; color: #44506a; line-height: 1.6; margin: 4px 2px 14px; }
+.alpha-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; }
+.al-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 12px 4px; background: #fff; border: 1.5px solid #e3ebff; border-radius: 12px; cursor: pointer; transition: transform .1s, border-color .15s, box-shadow .15s; }
+.al-cell:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(59,109,255,.15); }
+.al-cell.on { border-color: #3b6dff; box-shadow: 0 6px 16px rgba(59,109,255,.22); }
+.al-letter { font-size: 30px; font-weight: 800; color: #1f2a44; line-height: 1; }
+.al-sound { font-family: "Times New Roman", serif; font-size: 13px; color: #2b6cff; }
+.al-expand { grid-column: 1 / -1; }
+.al-detail { margin-top: 4px; padding: 14px 16px; background: #f7faff; border: 1.5px solid #d7e4ff; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.al-big { display: flex; align-items: baseline; gap: 8px; }
+.al-up { font-size: 56px; font-weight: 800; color: #3b6dff; line-height: .9; }
+.al-lo { font-size: 30px; color: #94a3c4; }
+.al-meta { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 7px; }
+.al-row { font-size: 14px; color: #33415c; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.al-k { display: inline-block; min-width: 56px; font-size: 12px; color: #fff; background: #8aa6d8; padding: 2px 8px; border-radius: 6px; text-align: center; }
+.al-meta b { font-family: "Times New Roman", serif; font-size: 16px; color: #2b6cff; }
+.al-words { min-width: 220px; }
+.al-words h4, .ph-words h4 { margin: 0 0 6px; font-size: 13px; color: #6b7280; font-weight: 700; }
+.al-words ul, .ph-words ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.al-words li, .ph-words li { font-size: 14.5px; display: flex; align-items: center; gap: 7px; }
+.w-ipa { font-family: "Times New Roman", serif; color: #2b6cff; font-style: normal; }
+.w-cn { color: #16a34a; }
+.al-tip, .phon-tip { width: 100%; font-size: 13px; color: #8a93a6; margin-top: 4px; }
+
+/* ===================== 音标课 ===================== */
+.phon-wrap { padding: 4px 2px 20px; }
+.phon-lead { font-size: 14.5px; color: #44506a; line-height: 1.6; margin: 4px 2px 16px; }
+.ph-group { margin-bottom: 18px; }
+.ph-gtitle { margin: 6px 2px; font-size: 15px; color: #1f2a44; }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 9px; }
+.ph-cell { padding: 12px 4px; background: #fff; border: 1.5px solid #e3ebff; border-radius: 11px; cursor: pointer; transition: transform .1s, border-color .15s, box-shadow .15s; display: flex; align-items: center; justify-content: center; }
+.ph-cell:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(59,109,255,.15); }
+.ph-cell.on { border-color: #3b6dff; box-shadow: 0 6px 16px rgba(59,109,255,.22); background: #f3f7ff; }
+.ph-sym { font-family: "Times New Roman", serif; font-size: 24px; font-weight: 700; color: #2b6cff; }
+.ph-expand { grid-column: 1 / -1; }
+.ph-mouth { padding: 10px 14px; background: #f7faff; border: 1.5px solid #d7e4ff; border-radius: 10px; font-size: 14px; color: #33415c; line-height: 1.55; }
+.ph-k { display: inline-block; font-size: 12px; color: #fff; background: #8aa6d8; padding: 2px 8px; border-radius: 6px; margin-right: 8px; }
+.ph-words { margin-top: 10px; }
