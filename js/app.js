@@ -2733,6 +2733,19 @@ function viewEtymon() {
 function blankify(s, spanCls) {
   return String(s || "").replace(/＿+|_+/g, '<span class="' + (spanCls || "gq-blank") + '">&nbsp;</span>');
 }
+/* 渲染端兜底：填空型题（选项全是短语）若题干漏写空位（如云端换题库质量不可控），
+   自动在句末标点前补一个 ___，避免出现「没有地方填」的坏题。
+   「正确的一句是？」这类选择题的选项是完整句子，不会被误补。 */
+function ensureBlank(q) {
+  const t = String((q && q.q) || "");
+  if (/_{2,}|＿/.test(t)) return t;                    // 已有空位
+  const opts = (q && q.opts) || [];
+  if (!opts.length) return t;
+  const isFill = opts.every(o => !/[.!?。！？]$/.test(String(o).trim()) && String(o).length <= 30);
+  if (!isFill) return t;                               // 选择整句型，不需要空位
+  const m = t.match(/^(.*?)([.?!。！？]\s*)$/);
+  return m ? m[1] + " ___" + m[2] : t + " ___";
+}
 /* 取语法题的整句中文：优先用题自带 cn，装配丢失时按题干文本查表回退 */
 function quizCn(q) {
   if (q && q.cn) return q.cn;
@@ -2760,7 +2773,7 @@ function grammarDailyBlock() {
         var picked = st.picked[qi];
         var ok = picked === q.a;
         return `<div class="gq-item">
-          <div class="gq-q">${qi + 1}. ${blankify(q.q)}</div>
+          <div class="gq-q">${qi + 1}. ${blankify(ensureBlank(q))}</div>
           ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
           <div class="gq-opts">
             ${q.opts.map(function (o, k) {
@@ -2978,7 +2991,7 @@ function quizBlock(i) {
         ${quiz.map((q, n) => {
           const ok = st.picks[n] === q.a;
           return `<div class="gq-item ${ok ? "ok" : "bad"}">
-            <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
+            <div class="gq-q">${n + 1}. ${blankify(ensureBlank(q))}</div>
             ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
             ${!ok ? `<div class="gq-your">你的答案：<s>${q.opts[st.picks[n]] ?? "未作答"}</s></div>` : ""}
             <div class="gq-right">正确答案：<b>${q.opts[q.a]}</b></div>
@@ -2997,7 +3010,7 @@ function quizBlock(i) {
         const ok = judged && picked === q.a;
         return `
       <div class="gq-item ${judged ? (ok ? "ok" : "bad") : "pending"}" id="gqItm${n}">
-        <div class="gq-q">${n + 1}. ${blankify(q.q)}</div>
+        <div class="gq-q">${n + 1}. ${blankify(ensureBlank(q))}</div>
         ${quizCn(q) ? `<div class="gq-cn">${quizCn(q)}</div>` : ""}
         <div class="gq-opts">
           ${q.opts.map((o, k) => {
