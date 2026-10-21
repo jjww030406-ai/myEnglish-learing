@@ -198,6 +198,32 @@
       saveLib(lib);
     } catch (e) {}
   }
+  /* 按需抓例句（单词卡 / 拼写页补例句用）。优先用词典 example，再退化。
+     返回 { s, sentCn } 或 null（查不到）。sentCn 由翻译接口兜底翻整句。 */
+  async function fetchSentence(w) {
+    try {
+      var dict = await fetchDict(String(w).toLowerCase());
+      if (dict && dict.ex) {
+        var cn = "";
+        try {
+          var c = await fetchCn(dict.ex);
+          if (c && c.cn && hasCJK(c.cn)) cn = c.cn;
+        } catch (e) {}
+        return { s: dict.ex, sentCn: cn };
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+  /* 把抓到的例句写回本地词库，永久保存 */
+  function saveSent(w, s, sentCn) {
+    try {
+      var lib = readLib();
+      for (var i = 0; i < lib.length; i++) {
+        if (lib[i].w === w) { lib[i].s = s; if (sentCn) lib[i].sentCn = sentCn; break; }
+      }
+      saveLib(lib);
+    } catch (e) {}
+  }
 
   /* ---------------- 网络：免费翻译 API（中文兜底，零依赖、无需 key、CORS 开放） ---------------- */
   function hasCJK(s) { return /[\u4e00-\u9fff]/.test(String(s || "")); }
@@ -257,14 +283,18 @@
     dict = dict || {}; extra = extra || {};
     // 中文释义只接受真中文；拿不到就留空（界面上会提示「暂无中文释义」），
     // 绝不把英文释义 / 英文单词本身冒充中文 —— 否则「看中文拼英文」根本没法做。
+    // 例句：优先用本地例句种子表（离线也有真实例句），其次云端词典 example，
+    // 再退化成释义、最后退化为单词本身（绝不让用户对着一个孤立中文干猜怎么造句）
+    var sent = (typeof SENT_SEED !== "undefined" && SENT_SEED[w]) ? SENT_SEED[w] : null;
     var cn = (extra.cn && hasCJK(extra.cn)) ? extra.cn : "";
-    var s = extra.s || dict.ex || (dict.def ? ("e.g. " + dict.def) : w);
+    var s = (sent ? sent.s : (extra.s || dict.ex || (dict.def ? ("e.g. " + dict.def) : w)));
+    var sentCn = (sent ? sent.sentCn : (extra.sentCn || ""));
     return {
       w: w,
       ph: dict.ph || "",
       cn: cn,
       s: s,
-      sentCn: extra.sentCn || "",
+      sentCn: sentCn,
       pos: extra.pos || dict.pos || "",
       def: dict.def || "",
       src: extra.cn ? "seed" : (dict.def ? "api" : "miss")
@@ -677,7 +707,7 @@
     loadDailyWords: loadDailyWords, loadDailyPhrases: loadDailyPhrases,
     loadDailyReading: loadDailyReading, loadDailyGrammar: loadDailyGrammar, loadDailyPhrasals: loadDailyPhrasals, loadDailyGQuiz: loadDailyGQuiz,
     pickDaily: pickDaily, extractJSON: extractJSON,
-    localDateStr: localDateStr, fetchDict: fetchDict, fetchPh: fetchPh, savePh: savePh, genCn: genCn,
+    localDateStr: localDateStr, fetchDict: fetchDict, fetchPh: fetchPh, savePh: savePh, fetchSentence: fetchSentence, saveSent: saveSent, genCn: genCn,
     applyWords: applyWords, applyPhrases: applyPhrases, applyReading: applyReading, applyGrammar: applyGrammar, applyPhrasals: applyPhrasals
   };
   if (typeof module !== "undefined" && module.exports) {
