@@ -4531,7 +4531,15 @@ function viewSent() {
         <span class="st-wcn">${esc(w.cn)}</span>
       </span>`;
     }
-    return "";
+    // 还没拼到的词：渲染成「待填槽」——词性 / 音标 / 中文提示都给，但不泄英文答案。
+    // 之前直接隐藏，整句只见一个框一个音标，用户会以为这句话只要填一个词。
+    const todoBlanks = "＿".repeat(Math.min(w.w.length, 10));
+    return `<span class="st-chip st-todo">
+      <b class="st-role">${w.role}</b>
+      <i class="st-ipa">${w.ipa || "&nbsp;"}</i>
+      <span class="st-todo-blank">${todoBlanks}</span>
+      <span class="st-wcn">${esc(w.cn)}</span>
+    </span>`;
   }).join("");
 
   // 底部按钮栏（句乐部同款：可鼠标点，也可用快捷键）
