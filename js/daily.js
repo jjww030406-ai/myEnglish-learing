@@ -468,7 +468,7 @@
           if (be) {
             done++;
             window.DAILY_INFO = { status: "loading", text: "🌐 正在" + makeupNote + "新词… (" + done + "/" + need.length + ")" };
-            safeRender();
+            if (window.refreshLibBadge) window.refreshLibBadge(); else safeRender();   // 只更新徽章，不整页重绘（防闪）
             return be;
           }
           // 后端未出结果（没配 key / 网络异常）→ 回落原直连管线
@@ -480,7 +480,7 @@
         if (!dict && !extra) return null;            // 连词典都查不到，跳过这个词
         done++;
         window.DAILY_INFO = { status: "loading", text: "🌐 正在" + makeupNote + "新词… (" + done + "/" + need.length + ")" };
-        safeRender();
+        if (window.refreshLibBadge) window.refreshLibBadge(); else safeRender();   // 只更新徽章，不整页重绘（防闪）
         return assemble(w, dict, extra || {});
       })();
     });
