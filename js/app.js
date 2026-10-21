@@ -5,7 +5,8 @@ const VIEWS = {
   home: viewHome, cards: viewCards, etymon: viewEtymon, grammar: viewGrammar,
   phrases: viewPhrases, quiz: viewQuiz, spell: viewSpell, me: viewMe,
   today: viewToday, wrong: viewWrong, review: viewReview, calendar: viewCalendar, read: viewRead,
-  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk, film: viewFilm, scriptlines: viewScriptLines
+  phrasals: viewPhrasals, sent: viewSent, talk: viewTalk, film: viewFilm, scriptlines: viewScriptLines,
+  alpha: window.viewAlpha, phon: window.viewPhon
 };
 
 /* 每个功能页的「页面头」元信息：图标、标题、副标题。
@@ -27,7 +28,9 @@ const PAGE_META = {
   sent:    { icon: "🧩", title: "拼句打字", sub: "看中文句子，逐词敲出英文，拼对的词变成彩色卡片" },
   talk:    { icon: "🗣", title: "情景对话", sub: "选个场景，你一句 AI 一句 —— 它会念给你听，顺手纠正你说得不地道的地方" },
   film:    { icon: "🎬", title: "影视学习", sub: "看电影/剧学英语：双语字幕 + 变速 + 点词发音 + 单句循环" },
-  scriptlines: { icon: "📝", title: "台词精读", sub: "原创情景喜剧对话：精读讲解 + 跟读打分 + 填空自测，零版权风险" }
+  scriptlines: { icon: "📝", title: "台词精读", sub: "原创情景喜剧对话：精读讲解 + 跟读打分 + 填空自测，零版权风险" },
+  alpha: { icon: "🔤", title: "字母启蒙", sub: "26 个字母：会读、会写、知道它在单词里发什么音" },
+  phon:  { icon: "🗣️", title: "音标课",   sub: "44 个英语音标：口型 + 例词，照着音标读生词" }
 };
 
 /* 功能页统一的页面头：标题 + 返回首页。让每个选项都像「独立的一页」 */
@@ -1395,6 +1398,8 @@ function viewHome() {
     : "先选一个模块开始，每天 15 分钟，慢慢来 —— 看不懂不要紧，照着念就有语感。")
     + proverbHtml();
   const cards = [
+    { v: "alpha", c: "alpha", icon: "🔤", t: "字母启蒙", d: "26 个字母：会读、会写、知道它在单词里发什么音——零基础第一步。" },
+    { v: "phon",  c: "phon",  icon: "🗣️", t: "音标课",   d: "44 个英语音标：口型 + 例词，会了它你就能照着音标读出任何生词。" },
     // 「每日复习」原本只靠顶部切换条进入；切换条移除后必须在这里留一个入口，否则该页会成为孤儿。
     { v: "review",  c: "review",  icon: "🔁", t: "每日复习", d: `复习你学会过的旧词（现在 ${S.learned.length} 个），每天抽几个出来防遗忘；拼错的会收进「错题本」。` },
     { v: "spell",   c: "spell",   icon: "⌨️", t: "拼写练习", d: "看中文，把英文一个字母一个字母敲出来。最核心的一步。" },
@@ -1410,8 +1415,20 @@ function viewHome() {
     { v: "read",    c: "read",    icon: "📖", t: "阅读",     d: "按你的进度给分级短文：整段翻译 / 填单词任选。" },
     { v: "sent",    c: "sent",    icon: "🧩", t: "拼句打字", d: (typeof SENTENCES !== "undefined" ? SENTENCES.length : 0) + " 个日常句子：看中文，逐词敲出英文，拼对的词变成彩色卡片，越连越上瘾。" },
     { v: "quiz",    c: "quiz",    icon: "✍️", t: "测验",     d: "每轮从你当前的词库随机抽 10 题（中→英 / 英→中随机），做完自动换一批，不固定。" },
-    { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" }
+    { v: "me",      c: "me",      icon: "📈", t: "我的",     d: "学习记录、星星、连续打卡天数和错词本。" },
+    { v: "today",   c: "today",   icon: "📅", t: "今日任务", d: "今天该学哪些词、哪些句子，哪些还没学，按顺序给你排好。" },
+    { v: "calendar",c: "calendar",icon: "📅", t: "学习日历", d: "哪天学了、哪天没学，连续打卡一目了然。" }
   ];
+  const cardByV = {}; cards.forEach(c => cardByV[c.v] = c);
+  const GROUPS = [
+    { tag:"① 发音基础", tip:"零基础从这里起步：先认字母，再学音标", items:["alpha","phon"] },
+    { tag:"② 词汇", tip:"积累第一批单词，知道意思也会拼", items:["spell","cards","etymon","review","wrong"] },
+    { tag:"③ 句子与语法", tip:"先拼句子找语感，再学主谓宾规则", items:["sent","grammar"] },
+    { tag:"④ 阅读", tip:"把词和句读成通顺的短文", items:["read"] },
+    { tag:"⑤ 听力与口语", tip:"听进去、说出来，练地道表达", items:["talk","film","scriptlines","phrases","phrasals"] },
+    { tag:"⑥ 学习管理", tip:"跟踪进度、订正错题、检验成果", items:["today","calendar","quiz","me"] }
+  ];
+
   return `
   <section class="hero">
     <div class="hero-glow"></div>
@@ -1447,16 +1464,20 @@ function viewHome() {
     </button>
   </section>
 
-  <h2>选择一个模块开始</h2>
-  <div class="nav-grid">
-    ${cards.map(c => `
-      <button class="nav-card nc-${c.c}" data-v="${c.v}">
-        <span class="nc-chip">${c.icon}</span>
-        <span class="nc-title">${c.t}</span>
-        <span class="nc-desc">${c.d}</span>
-        <span class="nc-go">进入 →</span>
-      </button>`).join("")}
-  </div>
+  <p class="path-lead">建议按这条路径学最顺：<b>① 发音基础</b>（字母→音标）→ <b>② 词汇</b> → <b>③ 句子与语法</b> → <b>④ 阅读</b> → <b>⑤ 听力口语</b> → <b>⑥ 学习管理</b>。每组的卡片都能点进去。</p>
+  ${GROUPS.map(g => `
+    <section class="path-group">
+      <div class="pg-head"><span class="pg-tag">${g.tag}</span><span class="pg-tip">${g.tip}</span></div>
+      <div class="nav-grid">
+        ${g.items.map(v => { const c = cardByV[v]; return `
+          <button class="nav-card nc-${c.c}" data-v="${c.v}">
+            <span class="nc-chip">${c.icon}</span>
+            <span class="nc-title">${c.t}</span>
+            <span class="nc-desc">${c.d}</span>
+            <span class="nc-go">进入 →</span>
+          </button>`; }).join("")}
+      </div>
+    </section>`).join("")}
 
   ${adaptiveBlock()}
   ${todayPlan()}
