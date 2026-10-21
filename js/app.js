@@ -574,6 +574,45 @@ function ensurePh(w) {
   }).catch(function () {});
 }
 
+function cssEsc(s) { try { return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s); } catch (e) { return String(s); } }
+
+/* 出题阶段就显示例句（含中文），让用户拼一个词时立刻知道怎么造句、怎么用。
+   显示「含目标词本体的完整英文句 + 中文翻译」；没例句时显示「加载中」，后台抓到就地填（不整页重绘）。 */
+function spSentInline(w) {
+  if (!w || !w.w) return "";
+  const has = !!(w.s && w.s.trim());
+  const en = has ? esc(w.s) : "🔤 例句加载中…";
+  const cn = (has && w.sentCn) ? esc(w.sentCn) : "";
+  return `<div class="sp-sent-inline${has ? "" : " sent-empty"}" data-sentw="${esc(w.w)}">
+    <span class="sp-si-label">📖 例句</span>
+    <span class="sp-si-en">${en}</span>
+    ${cn ? `<span class="sp-si-cn">（${cn}）</span>` : ""}
+    ${has ? `<button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊</button>` : ""}
+  </div>`;
+}
+
+var __sentCache = {};
+/* 拼写 / 卡片页加载时，若该词还没例句就后台抓（复用词典 example），抓到就地填进页面 + 写回词库。 */
+function ensureSent(w) {
+  if (!w || !w.w || (w.s && w.s.trim())) return;        // 已有例句（SENT_SEED / 云端已给）
+  if (Object.prototype.hasOwnProperty.call(__sentCache, w.w)) return;
+  __sentCache[w.w] = "";                                // 标记已查（含查无），避免重复请求
+  if (!window.DailyEngine || !window.DailyEngine.fetchSentence) return;
+  window.DailyEngine.fetchSentence(w.w).then(function (r) {
+    var fill = function (html) {
+      document.querySelectorAll('[data-sentw="' + cssEsc(w.w) + '"]').forEach(function (el) {
+        el.classList.remove("sent-empty"); el.innerHTML = html;
+      });
+    };
+    if (!r || !r.s) { fill('<span class="sp-si-label">📖 例句</span><span class="sp-si-en muted">（这个词暂无例句）</span>'); return; }
+    w.s = r.s; if (r.sentCn) w.sentCn = r.sentCn;
+    try { if (window.DailyEngine.saveSent) window.DailyEngine.saveSent(w.w, r.s, r.sentCn || ""); } catch (e) {}
+    fill('<span class="sp-si-label">📖 例句</span><span class="sp-si-en">' + esc(w.s) + '</span>' +
+      (w.sentCn ? '<span class="sp-si-cn">（' + esc(w.sentCn) + '）</span>' : '') +
+      '<button class="mini" onclick="speak(\'' + w.s.replace(/'/g, "\\'") + '\')">🔊</button>');
+  }).catch(function () {});
+}
+
 /* 每日单词状态横幅：状态已并入顶栏的「词库」徽章，这里不再单独显示 */
 /* ---------- 吉祥物互动 ----------
    点一下猫头鹰：蹦一下 + 弹出一句话。话不是写死的，按「当前时段 + 你的进度」挑，
@@ -2300,6 +2339,7 @@ function viewSpell() {
   const mode = SPELL_MODES.find(m => m.id === spMode);
   const len = w.w.length;
   ensurePh(w);                                           // 没音标就后台补，抓到就地填
+  ensureSent(w);                                          // 没例句就后台补，抓到就地填（含中文）
 
   // 提示区：按模式决定给多少信息
   let prompt = "";
@@ -2313,17 +2353,16 @@ function viewSpell() {
   if (spMode === "cn") {
     prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
       <div class="sp-cn">${cnOrFallback()}</div>
-      <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>`;
+      <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>` + spSentInline(w);
   } else if (spMode === "letter") {
     prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
       <div class="sp-cn">中文意思：${cnOrFallback()}</div>
-      <p class="ex">共 <b>${len}</b> 个字母，首字母是 <b class="big-first">${w.w[0]}</b></p>`;
+      <p class="ex">共 <b>${len}</b> 个字母，首字母是 <b class="big-first">${w.w[0]}</b></p>` + spSentInline(w);
   } else {
     prompt = `<div class="sp-ph${w.ph ? "" : " ph-empty"}" data-phw="${w.w}">${w.ph || "🔤 音标加载中…"}</div>
       <p class="ex" id="spMask">${maskSentence(w.s, w.w)}</p>
-      <button class="mini" onclick="speak('${w.s.replace(/'/g, "\\'")}')">🔊 听例句</button>
       <button class="mini" onclick="startSpeechText('${w.s.replace(/'/g, "\\'")}', 'sp')">🎤 跟读</button>
-      ${srIdx === "sp" && srCompare ? phraseCmpHtml() : ""}`;
+      ${srIdx === "sp" && srCompare ? phraseCmpHtml() : ""}` + (spMode === "dict" ? "" : spSentInline(w));
   }
   // 听写模式零基础最需要：句子的中文 + 每个词的意思
   if (spMode === "dict") prompt += sentenceHelp(w);
