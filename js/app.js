@@ -536,6 +536,25 @@ function libBadge() {
   }
   return `<span class="brand-lib lib-${cls}" title="${tip}">📚 词库 <b>${tail}</b></span>`;
 }
+/* 只更新顶栏「词库」徽章文字，不重建整个页面 —— 首屏补词是逐词回调的，
+   若每个词都整页 render 会连续几十上百次重绘，低配/移动端表现为「页面一直在闪」。 */
+window.refreshLibBadge = function () {
+  const el = document.querySelector(".brand-lib");
+  if (!el) return;
+  const b = el.querySelector("b");
+  if (!b) return;
+  const n = (typeof WORDS !== "undefined" ? WORDS.length : 0);
+  const i = window.DAILY_INFO || {};
+  let cls = "ok", tail = n + " 词", tip = "词库现在共 " + n + " 个单词，每天自动补充新词";
+  if (i.status === "loading") {
+    cls = "loading"; tail = (i.text || "补充中…").replace(/^🌐\s*/, ""); tip = "正在联网补充今日新词";
+  } else if (i.status === "offline" || i.status === "local") {
+    cls = "offline"; tail = n + " 词 · 本地"; tip = "当前离线，用的是本机内置词库；联网后会自动补充新词";
+  }
+  el.className = "brand-lib lib-" + cls;
+  el.title = tip;
+  b.textContent = tail;
+};
 
 /* 每日单词状态横幅：状态已并入顶栏的「词库」徽章，这里不再单独显示 */
 /* ---------- 吉祥物互动 ----------
