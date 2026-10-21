@@ -2947,6 +2947,13 @@ h2 { margin: 4px 0 14px; }
 .sp-sent-line { font-size: 15px; color: var(--ink, #1f2937); }
 .sp-sent-line b { color: var(--brand-d, #3b6dff); }
 .sp-sent-cn { margin-top: 5px; font-size: 14.5px; color: #16a34a; font-weight: 600; }
+/* 出题阶段就显示的例句（含中文），让用户拼词时知道怎么造句 */
+.sp-sent-inline { margin-top: 10px; padding: 8px 12px; background: #f3fbf4; border: 1px solid #d6efd9; border-radius: 10px; font-size: 15px; line-height: 1.6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sp-sent-inline.sent-empty { background: #f6f8fb; border-color: #e6ebf2; color: var(--muted); }
+.sp-si-label { font-size: 13px; opacity: .75; }
+.sp-si-en { color: var(--ink, #1f2937); font-weight: 600; }
+.sp-si-cn { color: #16a34a; font-weight: 600; font-size: 14px; }
+.sp-sent-inline .mini { margin-left: 2px; padding: 2px 8px; font-size: 12px; }
 .sp-sent-out { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d7e2ff; font-size: 14px; line-height: 1.65; }
 .sp-sent-out p { margin: 4px 0; }
 .sp-sent-out b { color: var(--brand-d, #3b6dff); }
