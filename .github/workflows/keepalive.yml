@@ -1,0 +1,31 @@
+# ============================================================================
+# 保活 Supabase 免费项目：免费版规则是「7 天无任何数据库请求就自动暂停」。
+# 这个定时任务每 5 天对 Supabase 发一次极轻量的 REST 查询（命中数据库），
+# 重置暂停计时器，使项目永远「有活动」而不会被暂停。
+# 说明：用到的 key 是 Supabase publishable(anon) key，本就公开在前端代码里，非机密。
+# ============================================================================
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # 每 5 天 UTC 09:00 跑一次（跨月也能保证间隔 ≤6 天，稳稳小于 7 天暂停窗口）
+    - cron: "0 9 */5 * *"
+  workflow_dispatch: {}   # 允许在 Actions 页面手动「Run workflow」触发一次，方便暂停后立刻验证
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST（一次轻量查询即算活动）
+        run: |
+          set +e
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: sb_publishable_2m6HQqQtZ06CHVfvf7hloA_EhFp6khq" \
+            -H "Authorization: Bearer sb_publishable_2m6HQqQtZ06CHVfvf7hloA_EhFp6khq" \
+            "https://vseeskrcwconhoknwstm.supabase.co/rest/v1/learning_progress?limit=1")
+          echo "Supabase REST 返回状态码: $CODE"
+          if [ "$CODE" = "200" ]; then
+            echo "✅ 项目活跃，不会被暂停"
+          else
+            echo "⚠️ 返回 $CODE：项目可能仍处于暂停态，请先去 Supabase 控制台点 Resume"
+          fi
